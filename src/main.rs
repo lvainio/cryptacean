@@ -5,7 +5,6 @@ use crate::hash::md5::hash;
 pub mod hash;
 
 fn main() {
-
     let start = Instant::now();
 
     let input: String = String::from("input");
