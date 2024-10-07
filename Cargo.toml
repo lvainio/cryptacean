@@ -1,5 +1,5 @@
 [package]
-name = "rust-md5"
+name = "rust-hash-cracker"
 version = "0.1.0"
 edition = "2021"
 
