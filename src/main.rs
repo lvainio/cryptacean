@@ -1,19 +1,22 @@
-use std::io;
+use std::time::Instant;
 
 use crate::hash::md5::hash;
 
 pub mod hash;
 
 fn main() {
-    let mut password: String = String::new();
 
-    println!("Enter your password: ");
-    io::stdin()
-        .read_line(&mut password)
-        .expect("Failed to read password");
-    let password_bytes = password.trim().as_bytes();
+    let start = Instant::now();
 
-    let my_hash = hash(password_bytes);
-    
-    println!("Hex: {}", my_hash);
+    let input: String = String::from("input");
+
+    let input = input.trim().as_bytes();
+
+    for _ in 0..1000000 {
+        hash(input);
+    }
+
+    let duration = start.elapsed();
+
+    println!("Time elapsed: {:?}", duration);
 }
