@@ -11,14 +11,33 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Format
-      run: cargo fmt
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      - uses: actions/checkout@v4
+      
+      - name: Build
+        run: cargo build --verbose
+        
+      # Optionally, you can save the build artifacts if needed
+      - name: Save Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: rust-build
+          path: target/debug  # Adjust the path to where your build artifacts are located
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build  # This job will only run after the build job is successful
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Optionally, download the build artifacts from the previous job
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: rust-build
+      
+      - name: Run tests
+        run: cargo test --verbose
