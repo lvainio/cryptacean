@@ -109,3 +109,42 @@ pub fn hash(input: &[u8]) -> String {
     }
     digest
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hash_works_on_rfc1321_suite() {
+        assert_eq!(hash(b""), "d41d8cd98f00b204e9800998ecf8427e");
+        assert_eq!(hash(b"a"), "0cc175b9c0f1b6a831c399e269772661");
+        assert_eq!(hash(b"abc"), "900150983cd24fb0d6963f7d28e17f72");
+        assert_eq!(hash(b"message digest"), "f96b697d7cb7938d525a2f31aaf161d0");
+        assert_eq!(
+            hash(b"abcdefghijklmnopqrstuvwxyz"),
+            "c3fcd3d76192e4007dfb496cca67e13b"
+        );
+        assert_eq!(
+            hash(b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"),
+            "d174ab98d277d9f5a5611c2c9f419d9f"
+        );
+        assert_eq!(
+            hash(
+                b"12345678901234567890123456789012345678901234567890123456789012345678901234567890"
+            ),
+            "57edf4a22be3c955ac49da2e2107b67a"
+        );
+    }
+
+    #[test]
+    fn hash_works_on_special_characters() {
+        assert_eq!(
+            hash("こんにちは, 世界! 😊✨".as_bytes()),
+            "9ef4d970ce73470d1a6f9d9d981c5055"
+        );
+        assert_eq!(
+            hash("안녕하세요, 세상! 🌏🎉".as_bytes()),
+            "783932e625c390e68c20a8cc7578ed5a"
+        );
+    }
+}
