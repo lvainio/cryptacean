@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
 
+use super::{HashFunction, Input, Output};
+
 const INIT_A: u32 = 0x67_45_23_01;
 const INIT_B: u32 = 0xEF_CD_AB_89;
 const INIT_C: u32 = 0x98_BA_DC_FE;
@@ -28,7 +30,7 @@ const T: [u32; 64] = [
     0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
 ];
 
-fn pad(input: &[u8]) -> Vec<u32> {
+fn pad(input: &Vec<u8>) -> Vec<u32> {
     let input_length: u64 = input.len() as u64;
     let input_length_in_bits: u64 = input_length * 8;
     let length_le_bytes: [u8; 8] = input_length_in_bits.to_le_bytes();
@@ -73,41 +75,37 @@ fn i_transform(x: u32, y: u32, z: u32) -> u32 {
     y ^ (x | !z)
 }
 
-pub fn hash(input: &[u8]) -> String {
-    let padded_input = pad(input);
-    let mut state: [u32; 4] = [INIT_A, INIT_B, INIT_C, INIT_D];
-    for block in padded_input.chunks(16) {
-        let state_copy: [u32; 4] = state;
-        let mut idx: VecDeque<usize> = VecDeque::from([0, 1, 2, 3]);
-        for round in 0..64 {
-            let transform = match round {
-                0..16 => f_transform,
-                16..32 => g_transform,
-                32..48 => h_transform,
-                _ => i_transform,
-            };
-            state[idx[0]] = state[idx[1]].wrapping_add(
-                state[idx[0]]
-                    .wrapping_add(transform(state[idx[1]], state[idx[2]], state[idx[3]]))
-                    .wrapping_add(block[K[round]])
-                    .wrapping_add(T[round])
-                    .rotate_left(S[round]),
-            );
-            idx.rotate_right(1);
+pub(super) struct MD5;
+
+impl HashFunction for MD5 {
+    fn hash(&self, input: &Input) -> Output {
+        let input: Vec<u32> = pad(&input.bytes);
+        let mut state: Vec<u32> = vec![INIT_A, INIT_B, INIT_C, INIT_D];
+        for block in input.chunks(16) {
+            let state_copy: Vec<u32> = state.clone();
+            let mut idx: VecDeque<usize> = VecDeque::from([0, 1, 2, 3]);
+            for round in 0..64 {
+                let transform = match round {
+                    0..16 => f_transform,
+                    16..32 => g_transform,
+                    32..48 => h_transform,
+                    _ => i_transform,
+                };
+                state[idx[0]] = state[idx[1]].wrapping_add(
+                    state[idx[0]]
+                        .wrapping_add(transform(state[idx[1]], state[idx[2]], state[idx[3]]))
+                        .wrapping_add(block[K[round]])
+                        .wrapping_add(T[round])
+                        .rotate_left(S[round]),
+                );
+                idx.rotate_right(1);
+            }
+            for i in 0..4 {
+                state[i] = state[i].wrapping_add(state_copy[i]);
+            }
         }
-        for i in 0..4 {
-            state[i] = state[i].wrapping_add(state_copy[i]);
-        }
+        Output::from_u32_le(state)
     }
-    let mut digest = String::new();
-    for &value in &state {
-        let bytes = value.to_le_bytes();
-        digest.push_str(&format!(
-            "{:02x}{:02x}{:02x}{:02x}",
-            bytes[0], bytes[1], bytes[2], bytes[3]
-        ));
-    }
-    digest
 }
 
 #[cfg(test)]
@@ -116,35 +114,31 @@ mod tests {
 
     #[test]
     fn hash_works_on_rfc1321_suite() {
-        assert_eq!(hash(b""), "d41d8cd98f00b204e9800998ecf8427e");
-        assert_eq!(hash(b"a"), "0cc175b9c0f1b6a831c399e269772661");
-        assert_eq!(hash(b"abc"), "900150983cd24fb0d6963f7d28e17f72");
-        assert_eq!(hash(b"message digest"), "f96b697d7cb7938d525a2f31aaf161d0");
-        assert_eq!(
-            hash(b"abcdefghijklmnopqrstuvwxyz"),
-            "c3fcd3d76192e4007dfb496cca67e13b"
+        let hasher = MD5;
+        let i1 = Input::from_str("");
+        let i2 = Input::from_str("a");
+        let i3 = Input::from_str("abc");
+        let i4 = Input::from_str("message digest");
+        let i5 = Input::from_str("abcdefghijklmnopqrstuvwxyz");
+        let i6 = Input::from_str("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
+        let i7 = Input::from_str(
+            "12345678901234567890123456789012345678901234567890123456789012345678901234567890",
         );
-        assert_eq!(
-            hash(b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"),
-            "d174ab98d277d9f5a5611c2c9f419d9f"
-        );
-        assert_eq!(
-            hash(
-                b"12345678901234567890123456789012345678901234567890123456789012345678901234567890"
-            ),
-            "57edf4a22be3c955ac49da2e2107b67a"
-        );
+        assert_eq!(hasher.hash(&i1).output, "d41d8cd98f00b204e9800998ecf8427e");
+        assert_eq!(hasher.hash(&i2).output, "0cc175b9c0f1b6a831c399e269772661");
+        assert_eq!(hasher.hash(&i3).output, "900150983cd24fb0d6963f7d28e17f72");
+        assert_eq!(hasher.hash(&i4).output, "f96b697d7cb7938d525a2f31aaf161d0");
+        assert_eq!(hasher.hash(&i5).output, "c3fcd3d76192e4007dfb496cca67e13b");
+        assert_eq!(hasher.hash(&i6).output, "d174ab98d277d9f5a5611c2c9f419d9f");
+        assert_eq!(hasher.hash(&i7).output, "57edf4a22be3c955ac49da2e2107b67a");
     }
 
     #[test]
     fn hash_works_on_special_characters() {
-        assert_eq!(
-            hash("こんにちは, 世界! 😊✨".as_bytes()),
-            "9ef4d970ce73470d1a6f9d9d981c5055"
-        );
-        assert_eq!(
-            hash("안녕하세요, 세상! 🌏🎉".as_bytes()),
-            "783932e625c390e68c20a8cc7578ed5a"
-        );
+        let hasher = MD5;
+        let i1 = Input::from_str("こんにちは, 世界! 😊✨");
+        let i2 = Input::from_str("안녕하세요, 세상! 🌏🎉");
+        assert_eq!(hasher.hash(&i1).output, "9ef4d970ce73470d1a6f9d9d981c5055");
+        assert_eq!(hasher.hash(&i2).output, "783932e625c390e68c20a8cc7578ed5a");
     }
 }
