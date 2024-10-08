@@ -1,1 +1,1 @@
-# cryptography
+# Rust Hash Cracker
