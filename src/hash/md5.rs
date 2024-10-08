@@ -119,7 +119,7 @@ mod tests {
         assert_eq!(hash(b""), "d41d8cd98f00b204e9800998ecf8427e");
         assert_eq!(hash(b"a"), "0cc175b9c0f1b6a831c399e269772661");
         assert_eq!(hash(b"abc"), "900150983cd24fb0d6963f7d28e17f72");
-        assert_eq!(hash(b"message digest"), "f96b697d7cb7938d525a2f31aaf161d0");
+        assert_eq!(hash(b"message digest"), "f96b697d7cb7938d525a2f31aaf161d");
         assert_eq!(
             hash(b"abcdefghijklmnopqrstuvwxyz"),
             "c3fcd3d76192e4007dfb496cca67e13b"
