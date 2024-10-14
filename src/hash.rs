@@ -1,5 +1,6 @@
 use clap::ValueEnum;
 
+pub mod md4;
 pub mod md5;
 pub mod sha1;
 
@@ -59,10 +60,10 @@ pub struct Hasher {
 
 impl Hasher {
     pub fn new(hashtype: HashType) -> Self {
-        let hash_func = match hashtype {
-            HashType::MD4 => Box::new(md5::MD5),
+        let hash_func: Box<dyn HashFunction> = match hashtype {
+            HashType::MD4 => Box::new(md4::MD4),
             HashType::MD5 => Box::new(md5::MD5),
-            HashType::SHA1 => Box::new(md5::MD5),
+            HashType::SHA1 => Box::new(sha1::SHA1),
         };
         Hasher { hash_func }
     }
