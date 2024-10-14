@@ -4,6 +4,7 @@ pub mod md5;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 pub enum HashType {
+    MD4,
     MD5,
     SHA1,
 }
@@ -13,16 +14,6 @@ pub struct Input {
 }
 
 impl Input {
-    fn from_vec(bytes: Vec<u8>) -> Input {
-        Input { bytes }
-    }
-
-    fn from_slice(bytes: &[u8]) -> Input {
-        Input {
-            bytes: bytes.to_vec(),
-        }
-    }
-
     pub fn from_string(msg: &str) -> Input {
         Input {
             bytes: msg.as_bytes().to_vec(),
@@ -51,4 +42,36 @@ impl Output {
 
 pub trait HashFunction {
     fn hash(&self, input: &Input) -> Output;
+}
+
+pub struct Hasher {
+    hash_func: Box<dyn HashFunction>
+}
+
+impl Hasher {
+    pub fn new(hashtype: HashType) -> Self {
+        let hash_func = match hashtype {
+            HashType::MD4 => Box::new(md5::MD5),
+            HashType::MD5 => Box::new(md5::MD5),
+            HashType::SHA1 => Box::new(md5::MD5),
+        };
+        Hasher {
+            hash_func
+        }
+    }
+
+    pub fn run(&self, words: &String, digest: &String) {
+        for word in words.lines() {
+            let input = Input::from_string(word);
+    
+            let output = self.hash_func.hash(&input).output;
+    
+            if *digest == output {
+                println!("found match: {word}");
+                println!("hash(word) = {output}");
+                println!("digest = {digest}");
+                break;
+            }
+        }
+    }
 }
