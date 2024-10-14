@@ -1,6 +1,14 @@
+use clap::ValueEnum;
+
 pub mod md5;
 
-struct Input {
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+pub enum HashType {
+    MD5,
+    SHA1,
+}
+
+pub struct Input {
     bytes: Vec<u8>,
 }
 
@@ -15,30 +23,24 @@ impl Input {
         }
     }
 
-    fn from_string(msg: String) -> Input {
-        Input {
-            bytes: msg.as_bytes().to_vec(),
-        }
-    }
-
-    fn from_str(msg: &str) -> Input {
+    pub fn from_string(msg: &str) -> Input {
         Input {
             bytes: msg.as_bytes().to_vec(),
         }
     }
 }
 
-struct Output {
-    output: String,
+pub struct Output {
+    pub output: String,
 }
 
 impl Output {
-    fn from_u8(output: Vec<u8>) -> Output {
+    pub fn from_u8(output: Vec<u8>) -> Output {
         let output = output.iter().map(|byte| format!("{:02x}", byte)).collect();
         Output { output }
     }
 
-    fn from_u32_le(output_u32: Vec<u32>) -> Output {
+    pub fn from_u32_le(output_u32: Vec<u32>) -> Output {
         let mut output_u8: Vec<u8> = Vec::new();
         for &value in &output_u32 {
             output_u8.extend_from_slice(&value.to_le_bytes());
@@ -47,6 +49,6 @@ impl Output {
     }
 }
 
-trait HashFunction {
+pub trait HashFunction {
     fn hash(&self, input: &Input) -> Output;
 }

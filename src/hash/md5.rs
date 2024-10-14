@@ -75,7 +75,7 @@ fn i_transform(x: u32, y: u32, z: u32) -> u32 {
     y ^ (x | !z)
 }
 
-pub(super) struct MD5;
+pub struct MD5;
 
 impl HashFunction for MD5 {
     fn hash(&self, input: &Input) -> Output {
@@ -115,13 +115,14 @@ mod tests {
     #[test]
     fn hash_works_on_rfc1321_suite() {
         let hasher = MD5;
-        let i1 = Input::from_str("");
-        let i2 = Input::from_str("a");
-        let i3 = Input::from_str("abc");
-        let i4 = Input::from_str("message digest");
-        let i5 = Input::from_str("abcdefghijklmnopqrstuvwxyz");
-        let i6 = Input::from_str("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
-        let i7 = Input::from_str(
+        let i1 = Input::from_string("");
+        let i2 = Input::from_string("a");
+        let i3 = Input::from_string("abc");
+        let i4 = Input::from_string("message digest");
+        let i5 = Input::from_string("abcdefghijklmnopqrstuvwxyz");
+        let i6 =
+            Input::from_string("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
+        let i7 = Input::from_string(
             "12345678901234567890123456789012345678901234567890123456789012345678901234567890",
         );
         assert_eq!(hasher.hash(&i1).output, "d41d8cd98f00b204e9800998ecf8427e");
@@ -136,8 +137,8 @@ mod tests {
     #[test]
     fn hash_works_on_special_characters() {
         let hasher = MD5;
-        let i1 = Input::from_str("こんにちは, 世界! 😊✨");
-        let i2 = Input::from_str("안녕하세요, 세상! 🌏🎉");
+        let i1 = Input::from_string("こんにちは, 世界! 😊✨");
+        let i2 = Input::from_string("안녕하세요, 세상! 🌏🎉");
         assert_eq!(hasher.hash(&i1).output, "9ef4d970ce73470d1a6f9d9d981c5055");
         assert_eq!(hasher.hash(&i2).output, "783932e625c390e68c20a8cc7578ed5a");
     }
