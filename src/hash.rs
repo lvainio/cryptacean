@@ -5,6 +5,7 @@ pub mod md5;
 pub mod sha1;
 pub mod sha224;
 pub mod sha256;
+pub mod sha384;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 pub enum HashType {
@@ -13,6 +14,7 @@ pub enum HashType {
     SHA1,
     SHA224,
     SHA256,
+    SHA384,
 }
 
 pub struct Input {
@@ -52,6 +54,14 @@ impl Output {
         }
         Output::from_u8(output_u8)
     }
+
+    pub fn from_u64_be(output_u64: Vec<u64>) -> Output {
+        let mut output_u8: Vec<u8> = Vec::new();
+        for &value in &output_u64 {
+            output_u8.extend_from_slice(&value.to_be_bytes());
+        }
+        Output::from_u8(output_u8)
+    }
 }
 
 pub trait HashFunction {
@@ -69,7 +79,8 @@ impl Hasher {
             HashType::MD5 => Box::new(md5::MD5),
             HashType::SHA1 => Box::new(sha1::SHA1),
             HashType::SHA256 => Box::new(sha256::SHA256),
-            HashType::SHA224 => Box::new(sha224::SHA224)
+            HashType::SHA224 => Box::new(sha224::SHA224),
+            HashType::SHA384 => Box::new(sha384::SHA384),
         };
         Hasher { hash_func }
     }
