@@ -3,12 +3,14 @@ use clap::ValueEnum;
 pub mod md4;
 pub mod md5;
 pub mod sha1;
+pub mod sha256;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 pub enum HashType {
     MD4,
     MD5,
     SHA1,
+    SHA256,
 }
 
 pub struct Input {
@@ -64,6 +66,7 @@ impl Hasher {
             HashType::MD4 => Box::new(md4::MD4),
             HashType::MD5 => Box::new(md5::MD5),
             HashType::SHA1 => Box::new(sha1::SHA1),
+            HashType::SHA256 => Box::new(sha256::SHA256),
         };
         Hasher { hash_func }
     }
