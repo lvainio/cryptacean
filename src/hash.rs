@@ -7,6 +7,7 @@ pub mod sha224;
 pub mod sha256;
 pub mod sha384;
 pub mod sha512;
+pub mod sha512_224;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 pub enum HashType {
@@ -17,6 +18,7 @@ pub enum HashType {
     SHA256,
     SHA384,
     SHA512,
+    SHA512_224,
 }
 
 pub struct Input {
@@ -84,6 +86,7 @@ impl Hasher {
             HashType::SHA224 => Box::new(sha224::SHA224),
             HashType::SHA384 => Box::new(sha384::SHA384),
             HashType::SHA512 => Box::new(sha512::SHA512),
+            HashType::SHA512_224 => Box::new(sha512_224::SHA512_224),
         };
         Hasher { hash_func }
     }
