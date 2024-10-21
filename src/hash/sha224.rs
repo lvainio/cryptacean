@@ -84,7 +84,12 @@ impl HashFunction for SHA224 {
             let mut w: Vec<u32> = block.to_vec();
 
             for t in 16..64 {
-                w.push(ssig1(w[t - 2]).wrapping_add(w[t - 7]).wrapping_add(ssig0(w[t - 15])).wrapping_add(w[t - 16]));
+                w.push(
+                    ssig1(w[t - 2])
+                        .wrapping_add(w[t - 7])
+                        .wrapping_add(ssig0(w[t - 15]))
+                        .wrapping_add(w[t - 16]),
+                );
             }
 
             let mut a = h.clone();
