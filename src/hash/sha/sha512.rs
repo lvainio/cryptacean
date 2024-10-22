@@ -1,4 +1,4 @@
-use super::{HashFunction, Input, Output};
+use crate::hash::{HashFunction, Input, Output};
 
 const K: [u64; 80] = [
     0x428a2f98d728ae22,

@@ -1,19 +1,17 @@
 use clap::ValueEnum;
 
-pub mod md4;
-pub mod md5;
-pub mod sha1;
-pub mod sha224;
-pub mod sha256;
-pub mod sha384;
-pub mod sha512;
-pub mod sha512_224;
-pub mod sha512_256;
+pub mod md;
+pub mod sha;
+
+use md::{md2, md4, md5};
+use sha::{sha0, sha1, sha224, sha256, sha384, sha512, sha512_224, sha512_256};
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 pub enum HashType {
+    MD2,
     MD4,
     MD5,
+    SHA0,
     SHA1,
     SHA224,
     SHA256,
@@ -81,8 +79,10 @@ pub struct Hasher {
 impl Hasher {
     pub fn new(hashtype: HashType) -> Self {
         let hash_func: Box<dyn HashFunction> = match hashtype {
+            HashType::MD2 => Box::new(md2::MD2),
             HashType::MD4 => Box::new(md4::MD4),
             HashType::MD5 => Box::new(md5::MD5),
+            HashType::SHA0 => Box::new(sha0::SHA0),
             HashType::SHA1 => Box::new(sha1::SHA1),
             HashType::SHA256 => Box::new(sha256::SHA256),
             HashType::SHA224 => Box::new(sha224::SHA224),

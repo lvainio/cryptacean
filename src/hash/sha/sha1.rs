@@ -1,4 +1,4 @@
-use super::{HashFunction, Input, Output};
+use crate::hash::{HashFunction, Input, Output};
 
 const H0: u32 = 0x67452301;
 const H1: u32 = 0xEFCDAB89;
