@@ -1,91 +1,71 @@
-use std::collections::VecDeque;
-
 use crate::hash::{HashFunction, Input, Output};
 
-const INIT_A: u32 = 0x67_45_23_01;
-const INIT_B: u32 = 0xEF_CD_AB_89;
-const INIT_C: u32 = 0x98_BA_DC_FE;
-const INIT_D: u32 = 0x10_32_54_76;
-
-const K: [usize; 48] = [
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14,
-    3, 7, 11, 15, 0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15,
+const S: [u8; 256] = [
+    41, 46, 67, 201, 162, 216, 124, 1, 61, 54, 84, 161, 236, 240, 6, 19, 98, 167, 5, 243, 192, 199,
+    115, 140, 152, 147, 43, 217, 188, 76, 130, 202, 30, 155, 87, 60, 253, 212, 224, 22, 103, 66,
+    111, 24, 138, 23, 229, 18, 190, 78, 196, 214, 218, 158, 222, 73, 160, 251, 245, 142, 187, 47,
+    238, 122, 169, 104, 121, 145, 21, 178, 7, 63, 148, 194, 16, 137, 11, 34, 95, 33, 128, 127, 93,
+    154, 90, 144, 50, 39, 53, 62, 204, 231, 191, 247, 151, 3, 255, 25, 48, 179, 72, 165, 181, 209,
+    215, 94, 146, 42, 172, 86, 170, 198, 79, 184, 56, 210, 150, 164, 125, 182, 118, 252, 107, 226,
+    156, 116, 4, 241, 69, 157, 112, 89, 100, 113, 135, 32, 134, 91, 207, 101, 230, 45, 168, 2, 27,
+    96, 37, 173, 174, 176, 185, 246, 28, 70, 97, 105, 52, 64, 126, 15, 85, 71, 163, 35, 221, 81,
+    175, 58, 195, 92, 249, 206, 186, 197, 234, 38, 44, 83, 13, 110, 133, 40, 132, 9, 211, 223, 205,
+    244, 65, 129, 77, 82, 106, 220, 55, 200, 108, 193, 171, 250, 36, 225, 123, 8, 12, 189, 177, 74,
+    120, 136, 149, 139, 227, 99, 232, 109, 233, 203, 213, 254, 59, 0, 29, 57, 242, 239, 183, 14,
+    102, 88, 208, 228, 166, 119, 114, 248, 235, 117, 75, 10, 49, 68, 80, 180, 143, 237, 31, 26,
+    219, 153, 141, 51, 159, 17, 131, 20,
 ];
 
-const S: [u32; 48] = [
-    3, 7, 11, 19, 3, 7, 11, 19, 3, 7, 11, 19, 3, 7, 11, 19, 3, 5, 9, 13, 3, 5, 9, 13, 3, 5, 9, 13,
-    3, 5, 9, 13, 3, 9, 11, 15, 3, 9, 11, 15, 3, 9, 11, 15, 3, 9, 11, 15,
-];
-
-fn pad(input: &Vec<u8>) -> Vec<u32> {
+fn pad(input: &Vec<u8>) -> Vec<u8> {
     let input_length: u64 = input.len() as u64;
-    let input_length_in_bits: u64 = input_length * 8;
-    let length_le_bytes: [u8; 8] = input_length_in_bits.to_le_bytes();
 
-    let input_length_mod_64: u64 = input_length % 64;
-    let padding_length: u64 = match input_length_mod_64 {
-        56 => 64,
-        _ => (56 + 64 - input_length_mod_64) % 64,
-    };
+    let num_padding_bytes: usize = (16 - (input_length % 16)) as usize;
+    
+    let padding_byte: u8 = num_padding_bytes as u8;
 
-    let total_length = (input_length + padding_length + 8) as usize;
-    let mut buffer: Vec<u8> = Vec::with_capacity(total_length);
-
+    let mut buffer: Vec<u8> = Vec::new();
     buffer.extend_from_slice(input);
-    buffer.push(0x80);
-    buffer.resize((input_length + padding_length) as usize, 0x00);
-    buffer.extend_from_slice(&length_le_bytes);
+    buffer.extend(vec![padding_byte; num_padding_bytes]);
 
-    let mut words: Vec<u32> = Vec::new();
-
-    for chunk in buffer.chunks_exact(4) {
-        let word = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
-        words.push(word);
+    let mut checksum: [u8; 16] = [0; 16];
+    let mut l: u8 = 0;
+    for chunk in buffer.chunks(16) {
+        for j in 0..16 {
+            let c = chunk[j];
+            // There is an error in the original pseudocode in rfc1319
+            // which is explained here: 
+            // https://www.rfc-editor.org/errata/rfc1319
+            checksum[j] = checksum[j] ^ S[(c ^ l) as usize];
+            l = checksum[j];
+        }
     }
+    buffer.extend_from_slice(&checksum);
 
-    words
-}
-
-fn f_transform(x: u32, y: u32, z: u32) -> u32 {
-    (x & y) | (!x & z)
-}
-
-fn g_transform(x: u32, y: u32, z: u32) -> u32 {
-    (x & y) | (x & z) | (y & z)
-}
-
-fn h_transform(x: u32, y: u32, z: u32) -> u32 {
-    x ^ y ^ z
+    buffer
 }
 
 pub struct MD2;
 
 impl HashFunction for MD2 {
     fn hash(&self, input: &Input) -> Output {
-        let input: Vec<u32> = pad(&input.bytes);
-        let mut state: Vec<u32> = vec![INIT_A, INIT_B, INIT_C, INIT_D];
-        for block in input.chunks(16) {
-            let state_copy: Vec<u32> = state.clone();
-            let mut idx: VecDeque<usize> = VecDeque::from([0, 1, 2, 3]);
-            for round in 0..48 {
-                let (transform, c): (fn(u32, u32, u32) -> u32, u32) = match round {
-                    0..16 => (f_transform, 0),
-                    16..32 => (g_transform, 0x5A827999),
-                    _ => (h_transform, 0x6ED9EBA1),
-                };
-                state[idx[0]] = state[idx[0]]
-                    .wrapping_add(transform(state[idx[1]], state[idx[2]], state[idx[3]]))
-                    .wrapping_add(block[K[round]])
-                    .wrapping_add(c)
-                    .rotate_left(S[round]);
+        let input: Vec<u8> = pad(&input.bytes);
+        let mut x: Vec<u8> = vec![0; 48];
 
-                idx.rotate_right(1);
+        for i in 0..(input.len() / 16) {
+            for j in 0..16 {
+                x[16 + j] = input[i*16+j];
+                x[32 + j] = x[16 + j] ^ x[j];
             }
-            for i in 0..4 {
-                state[i] = state[i].wrapping_add(state_copy[i]);
+            let mut t: u8 = 0;
+            for j in 0..18 {
+                for k in 0..48 {
+                    t = x[k] ^ S[t as usize];
+                    x[k] = t;
+                }
+                t = t.wrapping_add(j);
             }
         }
-        Output::from_u32_le(state)
+        Output::from_u8(x[0..16].to_vec())
     }
 }
 
@@ -94,7 +74,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hash_works_on_rfc1320_suite() {
+    fn hash_works_on_rfc1219_suite() {
         let hasher = MD2;
         let i1 = Input::from_string("");
         let i2 = Input::from_string("a");
@@ -106,13 +86,13 @@ mod tests {
         let i7 = Input::from_string(
             "12345678901234567890123456789012345678901234567890123456789012345678901234567890",
         );
-        assert_eq!(hasher.hash(&i1).output, "31d6cfe0d16ae931b73c59d7e0c089c0");
-        assert_eq!(hasher.hash(&i2).output, "bde52cb31de33e46245e05fbdbd6fb24");
-        assert_eq!(hasher.hash(&i3).output, "a448017aaf21d8525fc10ae87aa6729d");
-        assert_eq!(hasher.hash(&i4).output, "d9130a8164549fe818874806e1c7014b");
-        assert_eq!(hasher.hash(&i5).output, "d79e1c308aa5bbcdeea8ed63df412da9");
-        assert_eq!(hasher.hash(&i6).output, "043f8582f241db351ce627e153e7f0e4");
-        assert_eq!(hasher.hash(&i7).output, "e33b4ddc9c38f2199c3e7b164fcc0536");
+        assert_eq!(hasher.hash(&i1).output, "8350e5a3e24c153df2275c9f80692773");
+        assert_eq!(hasher.hash(&i2).output, "32ec01ec4a6dac72c0ab96fb34c0b5d1");
+        assert_eq!(hasher.hash(&i3).output, "da853b0d3f88d99b30283a69e6ded6bb");
+        assert_eq!(hasher.hash(&i4).output, "ab4f496bfb2a530b219ff33031fe06b0");
+        assert_eq!(hasher.hash(&i5).output, "4e8ddff3650292ab5a4108c3aa47940b");
+        assert_eq!(hasher.hash(&i6).output, "da33def2a42df13975352846c30338cd");
+        assert_eq!(hasher.hash(&i7).output, "d5976f79d83d3a0dc9806c3c66f3efd8");
     }
 
     #[test]
@@ -120,7 +100,7 @@ mod tests {
         let hasher = MD2;
         let i1 = Input::from_string("こんにちは, 世界! 😊✨");
         let i2 = Input::from_string("안녕하세요, 세상! 🌏🎉");
-        assert_eq!(hasher.hash(&i1).output, "df12e4291df494e45e59f7c0d17f8bce");
-        assert_eq!(hasher.hash(&i2).output, "6334b266cff8e05d6ccd33d852ed5fd9");
+        assert_eq!(hasher.hash(&i1).output, "4024008b9184e15e14ca56db5d8ba9b7");
+        assert_eq!(hasher.hash(&i2).output, "13e9383040d17f2c410aed46676aa873");
     }
 }
