@@ -1,4 +1,4 @@
-use super::{HashFunction, Input, Output};
+use crate::hash::{HashFunction, Input, Output};
 
 const K: [u32; 64] = [
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -11,14 +11,14 @@ const K: [u32; 64] = [
     0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 ];
 
-const H0: u32 = 0xc1059ed8;
-const H1: u32 = 0x367cd507;
-const H2: u32 = 0x3070dd17;
-const H3: u32 = 0xf70e5939;
-const H4: u32 = 0xffc00b31;
-const H5: u32 = 0x68581511;
-const H6: u32 = 0x64f98fa7;
-const H7: u32 = 0xbefa4fa4;
+const H0: u32 = 0x6a09e667;
+const H1: u32 = 0xbb67ae85;
+const H2: u32 = 0x3c6ef372;
+const H3: u32 = 0xa54ff53a;
+const H4: u32 = 0x510e527f;
+const H5: u32 = 0x9b05688c;
+const H6: u32 = 0x1f83d9ab;
+const H7: u32 = 0x5be0cd19;
 
 fn pad(input: &Vec<u8>) -> Vec<u32> {
     let input_length: u64 = input.len() as u64;
@@ -73,9 +73,9 @@ fn ssig1(x: u32) -> u32 {
     x.rotate_right(17) ^ x.rotate_right(19) ^ (x >> 10)
 }
 
-pub struct SHA224;
+pub struct SHA256;
 
-impl HashFunction for SHA224 {
+impl HashFunction for SHA256 {
     fn hash(&self, input: &Input) -> Output {
         let input: Vec<u32> = pad(&input.bytes);
         let mut h: Vec<u32> = vec![H0, H1, H2, H3, H4, H5, H6, H7];
@@ -120,7 +120,6 @@ impl HashFunction for SHA224 {
             h[6] = h[6].wrapping_add(a[6]);
             h[7] = h[7].wrapping_add(a[7]);
         }
-        h.pop();
         Output::from_u32_be(h)
     }
 }
@@ -131,7 +130,7 @@ mod tests {
 
     #[test]
     fn hash_works_on_rfc6234_suite() {
-        let hasher = SHA224;
+        let hasher = SHA256;
         let i1 = Input::from_string("abc");
         let i2 = Input::from_string("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
         let i3 = Input::from_string(&"a".repeat(1_000_000));
@@ -141,34 +140,34 @@ mod tests {
 
         assert_eq!(
             hasher.hash(&i1).output,
-            "23097D223405D8228642A477BDA255B32AADBCE4BDA0B3F7E36C9DA7".to_lowercase()
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad".to_lowercase()
         );
         assert_eq!(
             hasher.hash(&i2).output,
-            "75388B16512776CC5DBA5DA1FD890150B0C6455CB4F58B1952522525".to_lowercase()
+            "248D6A61D20638B8E5C026930C3E6039A33CE45964FF2167F6ECEDD419DB06C1".to_lowercase()
         );
         assert_eq!(
             hasher.hash(&i3).output,
-            "20794655980C91D8BBB4C1EA97618A4BF03F42581948B2EE4EE7AD67".to_lowercase()
+            "CDC76E5C9914FB9281A1C7E284D73E67F1809A48A497200E046D39CCC7112CD0".to_lowercase()
         );
         assert_eq!(
             hasher.hash(&i4).output,
-            "567F69F168CD7844E65259CE658FE7AADFA25216E68ECA0EB7AB8262".to_lowercase()
+            "594847328451BDFA85056225462CC1D867D877FB388DF0CE35F25AB5562BFBB5".to_lowercase()
         );
     }
 
     #[test]
     fn hash_works_on_special_characters() {
-        let hasher = SHA224;
+        let hasher = SHA256;
         let i1 = Input::from_string("こんにちは, 世界! 😊✨");
         let i2 = Input::from_string("안녕하세요, 세상! 🌏🎉");
         assert_eq!(
             hasher.hash(&i1).output,
-            "6275c61f92f4f9da7597c350c0f6714195ebf8a8a8010c84a988564d"
+            "eaf99d9a7b60c1f21df01b0f8b3c243580193e89a4c8a0620bfb19d19ac63162"
         );
         assert_eq!(
             hasher.hash(&i2).output,
-            "02a36b86572f61bceb94d9f9f61573dfd4003b042d861c18b86601f7"
+            "56d4df280685c39cd67feba07aa692d6229cb6f4bd291c7ce254bc4815dd407e"
         );
     }
 }

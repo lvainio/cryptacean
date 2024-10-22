@@ -1,4 +1,4 @@
-use super::{HashFunction, Input, Output};
+use crate::hash::{HashFunction, Input, Output};
 
 const K: [u64; 80] = [
     0x428a2f98d728ae22,
@@ -83,14 +83,14 @@ const K: [u64; 80] = [
     0x6c44198c4a475817,
 ];
 
-const H0: u64 = 0xcbbb9d5dc1059ed8;
-const H1: u64 = 0x629a292a367cd507;
-const H2: u64 = 0x9159015a3070dd17;
-const H3: u64 = 0x152fecd8f70e5939;
-const H4: u64 = 0x67332667ffc00b31;
-const H5: u64 = 0x8eb44a8768581511;
-const H6: u64 = 0xdb0c2e0d64f98fa7;
-const H7: u64 = 0x47b5481dbefa4fa4;
+const H0: u64 = 0x22312194FC2BF72C;
+const H1: u64 = 0x9F555FA3C84C64C2;
+const H2: u64 = 0x2393B86B6F53B151;
+const H3: u64 = 0x963877195940EABD;
+const H4: u64 = 0x96283EE2A88EFFE3;
+const H5: u64 = 0xBE5E1E2553863992;
+const H6: u64 = 0x2B0199FC2C85B8AA;
+const H7: u64 = 0x0EB72DDC81C52CA2;
 
 fn pad(input: &Vec<u8>) -> Vec<u64> {
     let input_length: u128 = input.len() as u128;
@@ -145,9 +145,17 @@ fn ssig1(x: u64) -> u64 {
     x.rotate_right(19) ^ x.rotate_right(61) ^ (x >> 6)
 }
 
-pub struct SHA384;
+fn u64_to_u8_vec(h: &Vec<u64>) -> Vec<u8> {
+    let mut output = Vec::with_capacity(h.len() * 8);
+    for &value in h {
+        output.extend_from_slice(&value.to_be_bytes());
+    }
+    output
+}
 
-impl HashFunction for SHA384 {
+pub struct SHA512_256;
+
+impl HashFunction for SHA512_256 {
     fn hash(&self, input: &Input) -> Output {
         let input: Vec<u64> = pad(&input.bytes);
         let mut h: Vec<u64> = vec![H0, H1, H2, H3, H4, H5, H6, H7];
@@ -192,9 +200,7 @@ impl HashFunction for SHA384 {
             h[6] = h[6].wrapping_add(a[6]);
             h[7] = h[7].wrapping_add(a[7]);
         }
-        h.pop();
-        h.pop();
-        Output::from_u64_be(h)
+        Output::from_u8(u64_to_u8_vec(&h)[0..32].to_vec())
     }
 }
 
@@ -203,45 +209,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hash_works_on_rfc6234_suite() {
-        let hasher = SHA384;
+    fn hash_works() {
+        let hasher = SHA512_256;
         let i1 = Input::from_string("abc");
         let i2 = Input::from_string("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu");
-        let i3 = Input::from_string(&"a".repeat(1_000_000));
-        let i4 = Input::from_string(
-            &"0123456701234567012345670123456701234567012345670123456701234567".repeat(10),
-        );
 
         assert_eq!(
             hasher.hash(&i1).output,
-            "CB00753F45A35E8BB5A03D699AC65007272C32AB0EDED1631A8B605A43FF5BED8086072BA1E7CC2358BAECA134C825A7".to_lowercase()
+            "53048e2681941ef99b2e29b76b4c7dabe4c2d0c634fc6d46e0e2f13107e7af23"
         );
         assert_eq!(
             hasher.hash(&i2).output,
-            "09330C33F71147E83D192FC782CD1B4753111B173B3B05D22FA08086E3B0F712FCC7C71A557E2DB966C3E9FA91746039".to_lowercase()
-        );
-        assert_eq!(
-            hasher.hash(&i3).output,
-            "9D0E1809716474CB086E834E310A4A1CED149E9C00F248527972CEC5704C2A5B07B8B3DC38ECC4EBAE97DDD87F3D8985".to_lowercase()
-        );
-        assert_eq!(
-            hasher.hash(&i4).output,
-            "2FC64A4F500DDB6828F6A3430B8DD72A368EB7F3A8322A70BC84275B9C0B3AB00D27A5CC3C2D224AA6B61A0D79FB4596".to_lowercase()
+            "3928e184fb8690f840da3988121d31be65cb9d3ef83ee6146feac861e19b563a"
         );
     }
 
     #[test]
     fn hash_works_on_special_characters() {
-        let hasher = SHA384;
+        let hasher = SHA512_256;
         let i1 = Input::from_string("こんにちは, 世界! 😊✨");
         let i2 = Input::from_string("안녕하세요, 세상! 🌏🎉");
         assert_eq!(
             hasher.hash(&i1).output,
-            "ef302cf00cfec95140f64fee17056a66e2fd8185912c0a65fb6c9f49f9d907cd153d052c2071953f6049cea7bb7d6f21"
+            "1e534922da8a094d246119581c39acae688d872ace29c8d718b5a021c07a4413"
         );
         assert_eq!(
             hasher.hash(&i2).output,
-            "3b24f81c896b6cd04da1890835673f6119d40d6377b3cd51c2f44c5daf01ae82f53700c0cb5b2b6a79df629cf1bdcae5"
+            "d3942d9dd1f1e85791d1b70a747759abb2da4e80585efac1585fd41ef395cd20"
         );
     }
 }

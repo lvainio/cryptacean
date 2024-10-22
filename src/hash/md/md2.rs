@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use super::{HashFunction, Input, Output};
+use crate::hash::{HashFunction, Input, Output};
 
 const INIT_A: u32 = 0x67_45_23_01;
 const INIT_B: u32 = 0xEF_CD_AB_89;
@@ -58,9 +58,9 @@ fn h_transform(x: u32, y: u32, z: u32) -> u32 {
     x ^ y ^ z
 }
 
-pub struct MD4;
+pub struct MD2;
 
-impl HashFunction for MD4 {
+impl HashFunction for MD2 {
     fn hash(&self, input: &Input) -> Output {
         let input: Vec<u32> = pad(&input.bytes);
         let mut state: Vec<u32> = vec![INIT_A, INIT_B, INIT_C, INIT_D];
@@ -95,7 +95,7 @@ mod tests {
 
     #[test]
     fn hash_works_on_rfc1320_suite() {
-        let hasher = MD4;
+        let hasher = MD2;
         let i1 = Input::from_string("");
         let i2 = Input::from_string("a");
         let i3 = Input::from_string("abc");
@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn hash_works_on_special_characters() {
-        let hasher = MD4;
+        let hasher = MD2;
         let i1 = Input::from_string("こんにちは, 世界! 😊✨");
         let i2 = Input::from_string("안녕하세요, 세상! 🌏🎉");
         assert_eq!(hasher.hash(&i1).output, "df12e4291df494e45e59f7c0d17f8bce");

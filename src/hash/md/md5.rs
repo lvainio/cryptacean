@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use super::{HashFunction, Input, Output};
+use crate::hash::{HashFunction, Input, Output};
 
 const INIT_A: u32 = 0x67_45_23_01;
 const INIT_B: u32 = 0xEF_CD_AB_89;
