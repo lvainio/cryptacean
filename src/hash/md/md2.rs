@@ -20,7 +20,7 @@ fn pad(input: &Vec<u8>) -> Vec<u8> {
     let input_length: u64 = input.len() as u64;
 
     let num_padding_bytes: usize = (16 - (input_length % 16)) as usize;
-    
+
     let padding_byte: u8 = num_padding_bytes as u8;
 
     let mut buffer: Vec<u8> = Vec::new();
@@ -33,7 +33,7 @@ fn pad(input: &Vec<u8>) -> Vec<u8> {
         for j in 0..16 {
             let c = chunk[j];
             // There is an error in the original pseudocode in rfc1319
-            // which is explained here: 
+            // which is explained here:
             // https://www.rfc-editor.org/errata/rfc1319
             checksum[j] = checksum[j] ^ S[(c ^ l) as usize];
             l = checksum[j];
@@ -53,7 +53,7 @@ impl HashFunction for MD2 {
 
         for i in 0..(input.len() / 16) {
             for j in 0..16 {
-                x[16 + j] = input[i*16+j];
+                x[16 + j] = input[i * 16 + j];
                 x[32 + j] = x[16 + j] ^ x[j];
             }
             let mut t: u8 = 0;

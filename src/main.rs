@@ -1,6 +1,6 @@
 use std::fs;
 
-use rust_hash_cracker::{cli, hash};
+use rust_crypto::{cli, hash};
 
 fn main() {
     let (digest, wordlist, hashtype) = cli::cli();

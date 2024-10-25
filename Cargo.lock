@@ -128,7 +128,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-hash-cracker"
+name = "rust-crypto"
 version = "0.1.0"
 dependencies = [
  "clap",
