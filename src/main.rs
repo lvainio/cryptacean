@@ -2,6 +2,8 @@ use std::fs;
 
 use rust_hash_cracker::{cli, hash};
 
+use rust_hash_cracker::cipher::rsa;
+
 fn main() {
     let (digest, wordlist, hashtype) = cli::cli();
 
