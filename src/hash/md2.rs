@@ -1,4 +1,4 @@
-use crate::hash::{HashFunction, Input, Output};
+use crate::hash::{Input, Output};
 
 const S: [u8; 256] = [
     41, 46, 67, 201, 162, 216, 124, 1, 61, 54, 84, 161, 236, 240, 6, 19, 98, 167, 5, 243, 192, 199,
@@ -46,8 +46,8 @@ fn pad(input: &Vec<u8>) -> Vec<u8> {
 
 pub struct MD2;
 
-impl HashFunction for MD2 {
-    fn hash(&self, input: &Input) -> Output {
+impl MD2 {
+    pub fn hash(&self, input: &Input) -> Output {
         let input: Vec<u8> = pad(&input.bytes);
         let mut x: Vec<u8> = vec![0; 48];
 

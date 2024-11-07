@@ -1,4 +1,4 @@
-# Rust Cryptography 
+# Cryptacean
 
 This repository contains from scratch implementations of some crypto primitives. 
 
@@ -22,5 +22,3 @@ This repository contains from scratch implementations of some crypto primitives.
 - MD5
 
 ## Supported Encryption Functions
-
-- RSA

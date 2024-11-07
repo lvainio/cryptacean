@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::hash::{HashFunction, Input, Output};
+use crate::hash::{Input, Output};
 
 const INIT_A: u32 = 0x67_45_23_01;
 const INIT_B: u32 = 0xEF_CD_AB_89;
@@ -60,8 +60,8 @@ fn h_transform(x: u32, y: u32, z: u32) -> u32 {
 
 pub struct MD4;
 
-impl HashFunction for MD4 {
-    fn hash(&self, input: &Input) -> Output {
+impl MD4 {
+    pub fn hash(&self, input: &Input) -> Output {
         let input: Vec<u32> = pad(&input.bytes);
         let mut state: Vec<u32> = vec![INIT_A, INIT_B, INIT_C, INIT_D];
         for block in input.chunks(16) {
