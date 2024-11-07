@@ -4,7 +4,7 @@ pub mod md;
 pub mod sha;
 
 use md::{md2, md4, md5};
-use sha::{sha0, sha1, sha224, sha256, sha384, sha3_224, sha512, sha512_224, sha512_256};
+use sha::{sha0, sha1, sha224, sha256, sha384, sha3_224, sha3_256, sha512, sha512_224, sha512_256};
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 pub enum HashType {
@@ -14,6 +14,7 @@ pub enum HashType {
     SHA0,
     SHA1,
     SHA3_224,
+    SHA3_256,
     SHA224,
     SHA256,
     SHA384,
@@ -68,6 +69,14 @@ impl Output {
         Output::from_u8(output_u8)
     }
 
+    pub fn from_u64_le(output_u64: Vec<u64>) -> Output {
+        let mut output_u8: Vec<u8> = Vec::new();
+        for &value in &output_u64 {
+            output_u8.extend_from_slice(&value.to_le_bytes());
+        }
+        Output::from_u8(output_u8)
+    }
+
     pub fn from_u64_le_drop_4_bytes(output_u64: Vec<u64>) -> Output {
         let mut output_u8: Vec<u8> = Vec::new();
         for &value in &output_u64 {
@@ -94,6 +103,7 @@ impl Hasher {
             HashType::SHA0 => Box::new(sha0::SHA0),
             HashType::SHA1 => Box::new(sha1::SHA1),
             HashType::SHA3_224 => Box::new(sha3_224::SHA3_224),
+            HashType::SHA3_256 => Box::new(sha3_256::SHA3_256),
             HashType::SHA256 => Box::new(sha256::SHA256),
             HashType::SHA224 => Box::new(sha224::SHA224),
             HashType::SHA384 => Box::new(sha384::SHA384),
