@@ -1,6 +1,6 @@
 use itertools::iproduct;
 
-use crate::hash::{HashFunction, Input, Output};
+use crate::hash::{Input, Output};
 
 const RHO_TABLE: [[u32; 5]; 5] = [
     [0, 36, 3, 41, 18],
@@ -141,8 +141,8 @@ impl SHA3_512 {
     }
 }
 
-impl HashFunction for SHA3_512 {
-    fn hash(&self, input: &Input) -> Output {
+impl SHA3_512 {
+    pub fn hash(&self, input: &Input) -> Output {
         let padded_input: Vec<u64> = pad(&mut input.bytes.clone());
         let mut state = State::new();
 
@@ -157,7 +157,7 @@ impl HashFunction for SHA3_512 {
             state.array[1][1] ^= block[6];
             state.array[2][1] ^= block[7];
             state.array[3][1] ^= block[8];
-          
+
             for rnd in 0..24 {
                 state = Self::theta(state);
                 Self::rho(&mut state);

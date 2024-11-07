@@ -1,4 +1,4 @@
-use crate::hash::{HashFunction, Input, Output};
+use crate::hash::{Input, Output};
 
 const H0: u32 = 0x67452301;
 const H1: u32 = 0xEFCDAB89;
@@ -53,10 +53,10 @@ fn k(t: u32) -> u32 {
     }
 }
 
-pub struct SHA0;
+pub struct SHA1;
 
-impl HashFunction for SHA0 {
-    fn hash(&self, input: &Input) -> Output {
+impl SHA1 {
+    pub fn hash(&self, input: &Input) -> Output {
         let input: Vec<u32> = pad(&input.bytes);
         let mut h: Vec<u32> = vec![H0, H1, H2, H3, H4];
 
@@ -64,7 +64,7 @@ impl HashFunction for SHA0 {
             let mut w: Vec<u32> = block.to_vec();
 
             for t in 16..80 {
-                w.push(w[t - 3] ^ w[t - 8] ^ w[t - 14] ^ w[t - 16]);
+                w.push((w[t - 3] ^ w[t - 8] ^ w[t - 14] ^ w[t - 16]).rotate_left(1));
             }
 
             let mut a = h.clone();
@@ -100,33 +100,45 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hash_works() {
-        let hasher = SHA0;
+    fn hash_works_on_rfc3174_suite() {
+        let hasher = SHA1;
         let i1 = Input::from_string("abc");
         let i2 = Input::from_string("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
+        let i3 = Input::from_string(&"a".repeat(1_000_000));
+        let i4 = Input::from_string(
+            &"0123456701234567012345670123456701234567012345670123456701234567".repeat(10),
+        );
 
         assert_eq!(
             hasher.hash(&i1).output,
-            "0164b8a914cd2a5e74c4f7ff082c4d97f1edf880"
+            "A9993E364706816ABA3E25717850C26C9CD0D89D".to_lowercase()
         );
         assert_eq!(
             hasher.hash(&i2).output,
-            "d2516ee1acfa5baf33dfc1c471e438449ef134c8"
+            "84983E441C3BD26EBAAE4AA1F95129E5E54670F1".to_lowercase()
+        );
+        assert_eq!(
+            hasher.hash(&i3).output,
+            "34AA973CD4C4DAA4F61EEB2BDBAD27316534016F".to_lowercase()
+        );
+        assert_eq!(
+            hasher.hash(&i4).output,
+            "DEA356A2CDDD90C7A7ECEDC5EBB563934F460452".to_lowercase()
         );
     }
 
     #[test]
     fn hash_works_on_special_characters() {
-        let hasher = SHA0;
+        let hasher = SHA1;
         let i1 = Input::from_string("こんにちは, 世界! 😊✨");
         let i2 = Input::from_string("안녕하세요, 세상! 🌏🎉");
         assert_eq!(
             hasher.hash(&i1).output,
-            "d04c7ded121be079aacdc834f1ed8bc7b254dd0f"
+            "ce98b555c324805e35e57209df43c0be3c3574fb"
         );
         assert_eq!(
             hasher.hash(&i2).output,
-            "cec3993b64fae339249cbf122ce700ff54c282f9"
+            "6b0ee0d3ddbf61b378f1889adf945f8894391325"
         );
     }
 }

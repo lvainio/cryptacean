@@ -1,6 +1,6 @@
 use itertools::iproduct;
 
-use crate::hash::{HashFunction, Input, Output};
+use crate::hash::{Input, Output};
 
 const RHO_TABLE: [[u32; 5]; 5] = [
     [0, 36, 3, 41, 18],
@@ -141,8 +141,8 @@ impl SHA3_256 {
     }
 }
 
-impl HashFunction for SHA3_256 {
-    fn hash(&self, input: &Input) -> Output {
+impl SHA3_256 {
+    pub fn hash(&self, input: &Input) -> Output {
         let padded_input: Vec<u64> = pad(&mut input.bytes.clone());
         let mut state = State::new();
 

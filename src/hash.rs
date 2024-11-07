@@ -1,32 +1,36 @@
-use clap::ValueEnum;
+pub mod md2;
+pub mod md4;
+pub mod md5;
 
-pub mod md;
-pub mod sha;
+pub mod sha0;
+pub mod sha1;
+pub mod sha224;
+pub mod sha256;
+pub mod sha384;
+pub mod sha3_224;
+pub mod sha3_256;
+pub mod sha3_384;
+pub mod sha3_512;
+pub mod sha512;
+pub mod sha512_224;
+pub mod sha512_256;
 
-use md::{md2, md4, md5};
-use sha::{
-    sha0, sha1, sha224, sha256, sha384, sha3_224, sha3_256, sha3_384, sha3_512, sha512, sha512_224,
-    sha512_256,
-};
+pub use md2::MD2;
+pub use md4::MD4;
+pub use md5::MD5;
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
-pub enum HashType {
-    MD2,
-    MD4,
-    MD5,
-    SHA0,
-    SHA1,
-    SHA3_224,
-    SHA3_256,
-    SHA3_384,
-    SHA3_512,
-    SHA224,
-    SHA256,
-    SHA384,
-    SHA512_224,
-    SHA512_256,
-    SHA512,
-}
+pub use sha0::SHA0;
+pub use sha1::SHA1;
+pub use sha224::SHA224;
+pub use sha256::SHA256;
+pub use sha384::SHA384;
+pub use sha3_224::SHA3_224;
+pub use sha3_256::SHA3_256;
+pub use sha3_384::SHA3_384;
+pub use sha3_512::SHA3_512;
+pub use sha512::SHA512;
+pub use sha512_224::SHA512_224;
+pub use sha512_256::SHA512_256;
 
 pub struct Input {
     bytes: Vec<u8>,
@@ -88,51 +92,5 @@ impl Output {
             output_u8.extend_from_slice(&value.to_le_bytes());
         }
         Output::from_u8(output_u8[..output_u8.len() - 4].to_vec())
-    }
-}
-
-pub trait HashFunction {
-    fn hash(&self, input: &Input) -> Output;
-}
-
-pub struct Hasher {
-    hash_func: Box<dyn HashFunction>,
-}
-
-impl Hasher {
-    pub fn new(hashtype: HashType) -> Self {
-        let hash_func: Box<dyn HashFunction> = match hashtype {
-            HashType::MD2 => Box::new(md2::MD2),
-            HashType::MD4 => Box::new(md4::MD4),
-            HashType::MD5 => Box::new(md5::MD5),
-            HashType::SHA0 => Box::new(sha0::SHA0),
-            HashType::SHA1 => Box::new(sha1::SHA1),
-            HashType::SHA3_224 => Box::new(sha3_224::SHA3_224),
-            HashType::SHA3_256 => Box::new(sha3_256::SHA3_256),
-            HashType::SHA3_384 => Box::new(sha3_384::SHA3_384),
-            HashType::SHA3_512 => Box::new(sha3_512::SHA3_512),
-            HashType::SHA256 => Box::new(sha256::SHA256),
-            HashType::SHA224 => Box::new(sha224::SHA224),
-            HashType::SHA384 => Box::new(sha384::SHA384),
-            HashType::SHA512 => Box::new(sha512::SHA512),
-            HashType::SHA512_224 => Box::new(sha512_224::SHA512_224),
-            HashType::SHA512_256 => Box::new(sha512_256::SHA512_256),
-        };
-        Hasher { hash_func }
-    }
-
-    pub fn run(&self, words: &String, digest: &String) {
-        for word in words.lines() {
-            let input = Input::from_string(word);
-
-            let output = self.hash_func.hash(&input).output;
-
-            if *digest == output {
-                println!("found match: {word}");
-                println!("hash(word) = {output}");
-                println!("digest = {digest}");
-                break;
-            }
-        }
     }
 }

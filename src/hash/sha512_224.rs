@@ -1,4 +1,4 @@
-use crate::hash::{HashFunction, Input, Output};
+use crate::hash::{Input, Output};
 
 const K: [u64; 80] = [
     0x428a2f98d728ae22,
@@ -155,8 +155,8 @@ fn u64_to_u8_vec(h: &Vec<u64>) -> Vec<u8> {
 
 pub struct SHA512_224;
 
-impl HashFunction for SHA512_224 {
-    fn hash(&self, input: &Input) -> Output {
+impl SHA512_224 {
+    pub fn hash(&self, input: &Input) -> Output {
         let input: Vec<u64> = pad(&input.bytes);
         let mut h: Vec<u64> = vec![H0, H1, H2, H3, H4, H5, H6, H7];
 
