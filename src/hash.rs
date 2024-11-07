@@ -5,7 +5,7 @@ pub mod sha;
 
 use md::{md2, md4, md5};
 use sha::{
-    sha0, sha1, sha224, sha256, sha384, sha3_224, sha3_256, sha3_384, sha512, sha512_224,
+    sha0, sha1, sha224, sha256, sha384, sha3_224, sha3_256, sha3_384, sha3_512, sha512, sha512_224,
     sha512_256,
 };
 
@@ -19,6 +19,7 @@ pub enum HashType {
     SHA3_224,
     SHA3_256,
     SHA3_384,
+    SHA3_512,
     SHA224,
     SHA256,
     SHA384,
@@ -109,6 +110,7 @@ impl Hasher {
             HashType::SHA3_224 => Box::new(sha3_224::SHA3_224),
             HashType::SHA3_256 => Box::new(sha3_256::SHA3_256),
             HashType::SHA3_384 => Box::new(sha3_384::SHA3_384),
+            HashType::SHA3_512 => Box::new(sha3_512::SHA3_512),
             HashType::SHA256 => Box::new(sha256::SHA256),
             HashType::SHA224 => Box::new(sha224::SHA224),
             HashType::SHA384 => Box::new(sha384::SHA384),
