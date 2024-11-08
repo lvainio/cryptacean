@@ -26,8 +26,6 @@ pub use sha512::SHA512;
 pub use sha512_224::SHA512_224;
 pub use sha512_256::SHA512_256;
 
-// TODO: rename Input to Message and Output to Digest
-
 pub struct Input {
     bytes: Vec<u8>,
 }
