@@ -25,11 +25,10 @@ const T3: usize = 31;
 const T4: usize = 67;
 
 const RIGHT_SHIFTS: [usize; 16] = [10, 5, 13, 10, 11, 12, 2, 7, 14, 15, 7, 13, 11, 7, 6, 12];
-
 const LEFT_SHIFTS: [usize; 16] = [11, 24, 9, 16, 15, 9, 27, 15, 6, 2, 29, 8, 15, 5, 31, 9];
 
-const S0: u64 = 0x0123456789abcdef;
-const S1: u64 = 0x7311c2812425cfa0;
+const S_PRIM: u64 = 0x0123456789abcdef;
+const S_STAR: u64 = 0x7311c2812425cfa0;
 
 fn pad(input: &Vec<u8>) -> Vec<u32> {
     let mut words: Vec<u32> = Vec::new();
@@ -127,32 +126,37 @@ impl MD6 {
     }
 }
 
-// TODO: Implement MD6_224, MD6_256, MD6_384, MD6_512 which just calls on the main implementation
-// TODO: they also mention MD6_160 for comparison ith sha1
+// TODO: Implement general MD6 (byte level version)
+// TODO: Implement MD6_160, MD6_224, MD6_256, MD6_384, MD6_512
+// TODO: Implement test cases for each major version
+// TODO: Implement compression function
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn md6_works() {
-        let md6 = MD6::new();
-        let i1 = Input::from_string("");
-        let i2 = Input::from_string("a");
-        let i3 = Input::from_string("abc");
-        let i4 = Input::from_string("message digest");
-        let i5 = Input::from_string("abcdefghijklmnopqrstuvwxyz");
-        let i6 =
-            Input::from_string("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
-        let i7 = Input::from_string(
-            "12345678901234567890123456789012345678901234567890123456789012345678901234567890",
-        );
-        assert_eq!(md6.hash(&i1).output, "d41d8cd98f00b204e9800998ecf8427e");
-        assert_eq!(md6.hash(&i2).output, "0cc175b9c0f1b6a831c399e269772661");
-        assert_eq!(md6.hash(&i3).output, "900150983cd24fb0d6963f7d28e17f72");
-        assert_eq!(md6.hash(&i4).output, "f96b697d7cb7938d525a2f31aaf161d0");
-        assert_eq!(md6.hash(&i5).output, "c3fcd3d76192e4007dfb496cca67e13b");
-        assert_eq!(md6.hash(&i6).output, "d174ab98d277d9f5a5611c2c9f419d9f");
-        assert_eq!(md6.hash(&i7).output, "57edf4a22be3c955ac49da2e2107b67a");
+    fn md6_160_works() {
+        
+    }
+
+    #[test]
+    fn md6_224_works() {
+        
+    }
+
+    #[test]
+    fn md6_256_works() {
+        
+    }
+
+    #[test]
+    fn md6_384_works() {
+        
+    }
+
+    #[test]
+    fn md6_512_works() {
+        
     }
 }
