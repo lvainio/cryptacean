@@ -101,8 +101,28 @@ fn compress(input: &[u64; 74], r: usize) -> [u64; 16] {
 }
 
 fn construct_v(r: usize, mode: usize, z: u64, p: usize, key_len: usize, d: usize) -> u64 {
-    // TODO
-    0
+    // 4 most significant bits should be 0000
+    let mut v: u64 = 0x0;
+
+    // next 12 bits should be r
+    v |= (r as u64) << 48;
+
+    // next 8 bits should be mode/L
+    v |= (mode as u64) << 40;
+
+    // next 4 bits should be z
+    v |= z << 36;
+
+    // next 16 bits should be p
+    v |= (p as u64) << 20;
+
+    // next 8 bits should be key_len
+    v |= (key_len as u64) << 12;
+
+    // 12 least significant bits should b d
+    v |= d as u64;
+
+    v
 }
 
 fn par(
@@ -118,7 +138,7 @@ fn par(
     let mut prev_message = prev_message.clone();
     prev_message.resize(prev_message.len() + zero_words_to_add, 0u64);
 
-    let new_message: Vec<u64> = Vec::new();
+    let mut new_message: Vec<u64> = Vec::new();
 
     let b = 4096;
     let j = (1).max(prev_m / (b * WORD_LENGTH));
@@ -138,7 +158,16 @@ fn par(
         // Step 4 - construct U
         let u: u64 = level * 2u64.pow(56) + i as u64;
 
-        // Step 5 - combine values and call compress, appedn to message
+        // Step 5 - combine values and call compress, appedn to new_message
+        let mut input: [u64; 74] = [0; 74];
+        input[..8].copy_from_slice(&key.key.as_slice()); // key
+        input[8] = u; // u
+        input[9] = v; // v
+        input[10..].copy_from_slice(&prev_message[i*64..((i+1)*64)]);
+
+        let chunk: [u64; 16] = compress(&input, r);
+
+        new_message.extend_from_slice(&chunk);
     }
     new_message
 }
