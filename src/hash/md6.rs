@@ -43,6 +43,7 @@ impl fmt::Display for MD6KeyError {
     }
 }
 
+#[derive(Clone)]
 pub struct MD6Key {
     key: Vec<u64>,
     key_len: usize,
@@ -125,18 +126,34 @@ fn construct_v(r: usize, mode: usize, z: u64, p: usize, key_len: usize, d: usize
     v
 }
 
-fn par(
-    prev_message: Vec<u64>,
-    d: usize,
-    key: MD6Key,
-    mode: usize,
-    r: usize,
-    level: u64,
-) -> Vec<u64> {
-    let prev_m = prev_message.len() * WORD_LENGTH;
-    let zero_words_to_add = 64 - (prev_message.len() % 64);
+fn to_u64_vec_be(prev_message: Vec<u8>) -> Vec<u64> {
+    // Ensure the length of prev_message is a multiple of 8
+    assert!(
+        prev_message.len() % 8 == 0,
+        "Input length must be a multiple of 8"
+    );
+
+    // Convert Vec<u8> to Vec<u64>
+    prev_message
+        .chunks_exact(8) // Take 8 bytes at a time
+        .map(|chunk| u64::from_be_bytes(chunk.try_into().unwrap())) // Convert each chunk to u64
+        .collect() // Collect the u64 values into a Vec<u64>
+}
+
+fn to_u8_vec_be(words: Vec<u64>) -> Vec<u8> {
+    words
+        .iter() // Iterate over each u64
+        .flat_map(|&word| word.to_be_bytes()) // Convert each u64 to [u8; 8] and flatten
+        .collect() // Collect all bytes into a Vec<u8>
+}
+
+fn par(prev_message: Vec<u8>, d: usize, key: MD6Key, mode: usize, r: usize, level: u64) -> Vec<u8> {
+    let prev_m = prev_message.len() * 8;
+    let zero_bytes_to_add = 512 - (prev_message.len() % 512);
     let mut prev_message = prev_message.clone();
-    prev_message.resize(prev_message.len() + zero_words_to_add, 0u64);
+    prev_message.resize(prev_message.len() + zero_bytes_to_add, 0u8);
+
+    let prev_message: Vec<u64> = to_u64_vec_be(prev_message);
 
     let mut new_message: Vec<u64> = Vec::new();
 
@@ -146,7 +163,7 @@ fn par(
         // STEP 1
         let mut p = 0;
         if i == j - 1 {
-            p = zero_words_to_add * WORD_LENGTH;
+            p = zero_bytes_to_add * 8;
         }
 
         // STEP 2
@@ -163,12 +180,13 @@ fn par(
         input[..8].copy_from_slice(&key.key.as_slice()); // key
         input[8] = u; // u
         input[9] = v; // v
-        input[10..].copy_from_slice(&prev_message[i*64..((i+1)*64)]);
+        input[10..].copy_from_slice(&prev_message[i * 64..((i + 1) * 64)]);
 
         let chunk: [u64; 16] = compress(&input, r);
 
         new_message.extend_from_slice(&chunk);
     }
+    let new_message = to_u8_vec_be(new_message);
     new_message
 }
 
@@ -205,36 +223,175 @@ impl MD6 {
         self.r = r;
         self
     }
-}
 
-impl MD6 {
     pub fn hash(&self, input: &Input) -> Output {
-        let input: Vec<u32> = vec![];
+        let input: Vec<u8> = input.bytes.clone();
+        let d: usize = self.d;
+        let key: MD6Key = self.key.clone();
+        let mode: usize = self.mode as usize;
+        let r: usize = self.r;
+        let c: usize = 16;
 
-        Output::from_u32_le(vec![])
+        let mut level = 0;
+        let mut m_curr = input.len() * 8;
+
+        level += 1;
+        let mut new_message: Vec<u8> = par(input.clone(), d, key.clone(), mode, r, level);
+        while new_message.len() * 8 != c * WORD_LENGTH {
+            level += 1;
+            new_message = par(input.clone(), d, key.clone(), mode, r, level);
+        }
+
+        let d_bytes = d / 8;
+        Output::from_u8(new_message[new_message.len() - d_bytes..].to_vec())
     }
 }
 
-// TODO: Implement general MD6 (byte level version)
-// TODO: Implement MD6_160, MD6_224, MD6_256, MD6_384, MD6_512
-// TODO: Implement test cases for each major version
+pub struct MD6_160 {
+    md6: MD6,
+}
+
+impl MD6_160 {
+    pub fn new() -> Self {
+        Self { md6: MD6::new(160) }
+    }
+
+    pub fn hash(&self, input: &Input) -> Output {
+        self.md6.hash(input)
+    }
+}
+
+pub struct MD6_224 {
+    md6: MD6,
+}
+
+impl MD6_224 {
+    pub fn new() -> Self {
+        Self { md6: MD6::new(224) }
+    }
+
+    pub fn hash(&self, input: &Input) -> Output {
+        self.md6.hash(input)
+    }
+}
+
+pub struct MD6_256 {
+    md6: MD6,
+}
+
+impl MD6_256 {
+    pub fn new() -> Self {
+        Self { md6: MD6::new(256) }
+    }
+
+    pub fn hash(&self, input: &Input) -> Output {
+        self.md6.hash(input)
+    }
+}
+
+pub struct MD6_384 {
+    md6: MD6,
+}
+
+impl MD6_384 {
+    pub fn new() -> Self {
+        Self { md6: MD6::new(384) }
+    }
+
+    pub fn hash(&self, input: &Input) -> Output {
+        self.md6.hash(input)
+    }
+}
+
+pub struct MD6_512 {
+    md6: MD6,
+}
+
+impl MD6_512 {
+    pub fn new() -> Self {
+        Self { md6: MD6::new(512) }
+    }
+
+    pub fn hash(&self, input: &Input) -> Output {
+        self.md6.hash(input)
+    }
+}
+
+// TODO: Implement SEQ and tests
+// TODO: Implement test case for general version if opssible
+// TODO: Clean up ugly code. Remove unused vars.
+// TODO: Documentation.
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn md6_160_works() {}
+    fn md6_160_works() {
+        let md6_160 = MD6_160::new();
+        let i1 = Input::from_string("");
+        let i2 = Input::from_string("abc");
+        assert_eq!(
+            md6_160.hash(&i1).output,
+            "f325ee93c54cfaacd7b9007e1cf8904680993b18"
+        );
+        assert_eq!(
+            md6_160.hash(&i2).output,
+            "b5c2d6a7ce6be0c18c9a38b17a0db705c81ab6b5"
+        );
+    }
 
     #[test]
-    fn md6_224_works() {}
+    fn md6_224_works() {
+        let md6_224 = MD6_224::new();
+        let i1 = Input::from_string("");
+        let i2 = Input::from_string("abc");
+        assert_eq!(
+            md6_224.hash(&i1).output,
+            "d2091aa2ad17f38c51ade2697f24cafc3894c617c77ffe10fdc7abcb"
+        );
+        assert_eq!(
+            md6_224.hash(&i2).output,
+            "510c30e4202a5cdd8a4f2ae9beebb6f5988128897937615d52e6d228"
+        );
+    }
 
     #[test]
-    fn md6_256_works() {}
+    fn md6_256_works() {
+        let md6_256 = MD6_256::new();
+        let i1 = Input::from_string("");
+        let i2 = Input::from_string("abc");
+        assert_eq!(
+            md6_256.hash(&i1).output,
+            "bca38b24a804aa37d821d31af00f5598230122c5bbfc4c4ad5ed40e4258f04ca"
+        );
+        assert_eq!(
+            md6_256.hash(&i2).output,
+            "230637d4e6845cf0d092b558e87625f03881dd53a7439da34cf3b94ed0d8b2c5"
+        );
+    }
 
     #[test]
-    fn md6_384_works() {}
+    fn md6_384_works() {
+        let md6_384 = MD6_384::new();
+        let i1 = Input::from_string("");
+        let i2 = Input::from_string("abc");
+        assert_eq!(
+            md6_384.hash(&i1).output,
+            "b0bafffceebe856c1eff7e1ba2f539693f828b532ebf60ae9c16cbc3499020401b942ac25b310b2227b2954ccacc2f1f"
+        );
+        assert_eq!(
+            md6_384.hash(&i2).output,
+            "e2c6d31dd8872cbd5a1207481cdac581054d13a4d4fe6854331cd8cf3e7cbafbaddd6e2517972b8ff57cdc4806d09190"
+        );
+    }
 
     #[test]
-    fn md6_512_works() {}
+    fn md6_512_works() {
+        let md6_512 = MD6_512::new();
+        let i1 = Input::from_string("");
+        let i2 = Input::from_string("abc");
+        assert_eq!(md6_512.hash(&i1).output, "6b7f33821a2c060ecdd81aefddea2fd3c4720270e18654f4cb08ece49ccb469f8beeee7c831206bd577f9f2630d9177979203a9489e47e04df4e6deaa0f8e0c0");
+        assert_eq!(md6_512.hash(&i2).output, "00918245271e377a7ffb202b90f3bda5477d8feab12d8a3a8994ebc55fe6e74ca8341520032eeea3fdef892f2882378f636212af4b2683ccf80bf025b7d9b457");
+    }
 }
