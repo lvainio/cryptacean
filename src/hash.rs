@@ -13,20 +13,6 @@ pub mod sha512;
 pub mod sha512_224;
 pub mod sha512_256;
 
-pub use md2::MD2;
-pub use md4::MD4;
-pub use md5::MD5;
-
-pub use sha0::SHA0;
-pub use sha1::SHA1;
-pub use sha224::SHA224;
-pub use sha256::SHA256;
-pub use sha3::{SHA3_224, SHA3_256, SHA3_384, SHA3_512};
-pub use sha384::SHA384;
-pub use sha512::SHA512;
-pub use sha512_224::SHA512_224;
-pub use sha512_256::SHA512_256;
-
 pub struct Input {
     bytes: Vec<u8>,
 }
