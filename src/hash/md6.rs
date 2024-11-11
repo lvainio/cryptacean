@@ -1,4 +1,4 @@
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, io::Write};
 
 use crate::hash::{Input, Output};
 
@@ -60,70 +60,28 @@ pub struct MD6Key {
 
 impl MD6Key {
     pub fn new(key: &Vec<u8>) -> Result<Self, MD6Error> {
-        const MAX_KEY_LEN: usize = 64;  
+        const MAX_KEY_LEN: usize = 64;
         let key_len: usize = key.len();
         if key_len > MAX_KEY_LEN {
             return Err(MD6Error::KeyLenOutOfBounds);
-        } 
+        }
         let mut key = key.clone();
         key.resize(64, 0);
         let key: Vec<u64> = key
             .chunks_exact(8)
             .map(|chunk| u64::from_be_bytes(chunk.try_into().unwrap()))
             .collect();
-        Ok(Self { key, key_len }) 
+        Ok(Self { key, key_len })
     }
 }
 
-fn compress(input: &[u64; 74], r: usize) -> [u64; 16] {
-    let c: usize = 16;
-    let n: usize = 89;
-    let t: usize = r * c;
-
-    let mut a_vec: Vec<u64> = Vec::with_capacity(n);
-    a_vec.extend_from_slice(&Q);
-    a_vec.extend_from_slice(input);
-
-    let mut s_vec: Vec<u64> = vec![S_PRIM_0];
-    for i in 1..r {
-        s_vec.push(s_vec[i - 1].rotate_left(1) ^ (s_vec[i - 1] & S_STAR));
-    }
-
-    for i in n..(t + n) {
-        let mut x = s_vec[(i - n) / 16] ^ a_vec[i - n] ^ a_vec[i - T0];
-        x ^= (a_vec[i - T1] & a_vec[i - T2]) ^ (a_vec[i - T3] & a_vec[i - T4]);
-        x ^= x >> RIGHT_SHIFTS[(i - n) % 16];
-        a_vec.push(x ^ (x << LEFT_SHIFTS[(i - n) % 16]));
-    }
-
-    let mut chaining_value = [0u64; 16];
-    chaining_value.copy_from_slice(&a_vec[a_vec.len() - 16..]);
-    chaining_value
-}
-
-fn construct_v(r: usize, mode: usize, z: u64, p: usize, key_len: usize, d: usize) -> u64 {
-    // 4 most significant bits should be 0000
-    let mut v: u64 = 0x0;
-
-    // next 12 bits should be r
-    v |= (r as u64) << 48;
-
-    // next 8 bits should be mode/L
-    v |= (mode as u64) << 40;
-
-    // next 4 bits should be z
-    v |= z << 36;
-
-    // next 16 bits should be p
-    v |= (p as u64) << 20;
-
-    // next 8 bits should be key_len
-    v |= (key_len as u64) << 12;
-
-    // 12 least significant bits should b d
-    v |= d as u64;
-
-    v
+fn build_v(r: usize, mode: usize, z: u64, p: usize, key_len: usize, d: usize) -> u64 {
+    (r as u64) << 48
+        | (mode as u64) << 40
+        | z << 36
+        | (p as u64) << 20
+        | (key_len as u64) << 12
+        | d as u64
 }
 
 fn to_u64_vec_be(prev_message: Vec<u8>) -> Vec<u64> {
@@ -147,62 +105,6 @@ fn to_u8_vec_be(words: Vec<u64>) -> Vec<u8> {
         .collect() // Collect all bytes into a Vec<u8>
 }
 
-fn par(prev_message: Vec<u8>, d: usize, key: MD6Key, mode: usize, r: usize, level: u64) -> Vec<u8> {
-    let prev_m = prev_message.len() * 8;
-
-    // TODO: idea of just doing a pad in beginning so i can send u64s to this function only!!!
-    // TODO: 
-
-    let mut zero_bytes_to_add = 512 - (prev_message.len() % 512);
-    if zero_bytes_to_add % 512 == 0 && prev_m > 0 {
-        zero_bytes_to_add = 0;
-    }
-
-    let mut prev_message = prev_message.clone();
-    prev_message.resize(prev_message.len() + zero_bytes_to_add, 0u8);
-
-    let prev_m = prev_message.len() * 8;
-
-    let prev_message: Vec<u64> = to_u64_vec_be(prev_message);
-
-    let mut new_message: Vec<u64> = Vec::new();
-
-    let b = 64;
-    let j = (1).max(prev_m / (b * WORD_LENGTH));
-
-    for i in 0..j {
-        // STEP 1
-        let mut p = 0;
-        if i == j - 1 {
-            p = zero_bytes_to_add * 8;
-        }
-
-        // STEP 2
-        let z: u64 = if j == 1 { 1 } else { 0 };
-
-        // STEP 3 - construct V function
-        let v: u64 = construct_v(r, mode, z, p, key.key_len, d);
-
-        // Step 4 - construct U
-        let u: u64 = level * 2u64.pow(56) + i as u64;
-
-        // Step 5 - combine values and call compress, appedn to new_message, SHOULD THIS BE INPUT???
-        let mut input: [u64; 74] = [0; 74];
-        input[..8].copy_from_slice(&key.key.as_slice()); // key
-        input[8] = u; // u
-        input[9] = v; // v
-        input[10..].copy_from_slice(&prev_message[i * 64..((i + 1) * 64)]);
-
-        let chunk: [u64; 16] = compress(&input, r);
-
-        new_message.extend_from_slice(&chunk);
-    }
-
-    let new_message = to_u8_vec_be(new_message);
-
-    new_message
-}
-
 fn seq(prev_message: Vec<u8>, d: usize, key: MD6Key, mode: usize, r: usize, level: u64) -> Vec<u8> {
     let prev_m = prev_message.len() * 8;
     let zero_bytes_to_add = 384 - (prev_message.len() % 384);
@@ -223,19 +125,26 @@ fn seq(prev_message: Vec<u8>, d: usize, key: MD6Key, mode: usize, r: usize, leve
 pub struct MD6 {
     d: usize,     // (output length in bits, 1..=512)
     key: MD6Key, // Optional (not sure what happens when null yet so lets keep it like this for now TODO:)
-    mode: u64,   // 0..=64 Optional but has a default value so should NOT be an Option
-    r: usize,    // (number of rounds)
+    mode: u64, // 0..=64 Optional but has a default value so should NOT be an Option TODO Switch to usize?
+    r: usize,  // (number of rounds)
     level: usize, // tree level
+    rc: Vec<u64>,
 }
 
 impl MD6 {
     pub fn new(d: usize) -> Self {
+        let r: usize = 40 + (d / 4);
+        let mut rc: Vec<u64> = vec![S_PRIM_0];
+        for i in 1..r {
+            rc.push(rc[i - 1].rotate_left(1) ^ (rc[i - 1] & S_STAR));
+        }
         Self {
             d,
             key: MD6Key::new(&vec![]).unwrap(),
             mode: 64,
-            r: 40 + (d / 4),
+            r,
             level: 0,
+            rc,
         }
     }
 
@@ -250,7 +159,12 @@ impl MD6 {
     }
 
     pub fn with_rounds(mut self, r: usize) -> Self {
+        let mut rc: Vec<u64> = vec![S_PRIM_0];
+        for i in 1..r {
+            rc.push(rc[i - 1].rotate_left(1) ^ (rc[i - 1] & S_STAR));
+        }
         self.r = r;
+        self.rc = rc;
         self
     }
 
@@ -265,15 +179,82 @@ impl MD6 {
         let mut level = 0;
 
         level += 1;
-        let mut new_message: Vec<u8> = par(input.clone(), d, key.clone(), mode, r, level);
+        let mut new_message: Vec<u8> = self.par(input.clone(), level);
 
         while new_message.len() * 8 != c * WORD_LENGTH {
             level += 1;
-            new_message = par(new_message.clone(), d, key.clone(), mode, r, level);
+            new_message = self.par(new_message.clone(), level);
         }
 
         let d_bytes = d / 8;
         Output::from_u8(new_message[new_message.len() - d_bytes..].to_vec())
+    }
+
+    fn compress(&self, a_vec: &mut Vec<u64>) {
+        const N: usize = 89;
+        const C: usize = 16;
+        let t: usize = self.r * C;
+
+        for i in N..(t + N) {
+            let mut x = self.rc[(i - N) / 16] ^ a_vec[i - N] ^ a_vec[i - T0];
+            x ^= (a_vec[i - T1] & a_vec[i - T2]) ^ (a_vec[i - T3] & a_vec[i - T4]);
+            x ^= x >> RIGHT_SHIFTS[(i - N) % C];
+            a_vec.push(x ^ (x << LEFT_SHIFTS[(i - N) % C]));
+        }
+    }
+
+    
+
+    fn par(&self, prev_message: Vec<u8>, level: u64) -> Vec<u8> {
+        let prev_m = prev_message.len() * 8;
+
+        // TODO: idea of just doing a pad in beginning so i can send u64s to this function only!!!
+
+        let mut zero_bytes_to_add = 512 - (prev_message.len() % 512);
+        if zero_bytes_to_add % 512 == 0 && prev_m > 0 {
+            zero_bytes_to_add = 0;
+        }
+
+        let mut prev_message = prev_message.clone();
+        prev_message.resize(prev_message.len() + zero_bytes_to_add, 0u8);
+
+        let prev_m = prev_message.len() * 8;
+
+        let prev_message: Vec<u64> = to_u64_vec_be(prev_message);
+
+        let mut new_message: Vec<u64> = Vec::new(); // allocate correct size directly no
+
+        let b = 64;
+        let j = (1).max(prev_m / (b * WORD_LENGTH));
+
+        for i in 0..j {
+            // STEP 1
+            let mut p = 0;
+            if i == j - 1 {
+                p = zero_bytes_to_add * 8;
+            }
+
+            let z: u64 = if j == 1 { 1 } else { 0 };
+            let v: u64 = build_v(self.r, self.mode as usize, z, p, self.key.key_len, self.d);
+            let u: u64 = level * 2u64.pow(56) + i as u64;
+
+            let mut input: Vec<u64> = Vec::with_capacity(89);
+            input.extend_from_slice(&Q);
+            input.extend_from_slice(&self.key.key.as_slice());
+            input.push(u);
+            input.push(v);
+            input.extend_from_slice(&prev_message[i * 64..((i + 1) * 64)]);
+
+            self.compress(&mut input);
+
+            let chunk: &[u64] = &input[input.len() - 16..];
+
+            new_message.extend_from_slice(&chunk);
+        }
+
+        let new_message = to_u8_vec_be(new_message);
+
+        new_message
     }
 }
 
@@ -366,7 +347,7 @@ mod tests {
         let result = MD6Key::new(&vec![0; 65]);
         assert!(matches!(result, Err(MD6Error::KeyLenOutOfBounds)));
     }
-    
+
     const NUM_INPUTS: usize = 10;
     const INPUTS: [(&str, usize); NUM_INPUTS] = [
         ("", 1),
