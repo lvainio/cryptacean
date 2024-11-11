@@ -16,6 +16,7 @@ pub mod sha512_256;
 pub use md2::MD2;
 pub use md4::MD4;
 pub use md5::MD5;
+pub use md6::{MD6Key, MD6, MD6_160, MD6_224, MD6_256, MD6_384, MD6_512};
 
 pub use sha0::SHA0;
 pub use sha1::SHA1;
