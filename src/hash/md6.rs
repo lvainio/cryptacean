@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{error::Error, fmt};
 
 use crate::hash::{Input, Output};
 
@@ -35,13 +35,22 @@ const S_PRIM_0: u64 = 0x0123456789abcdef;
 const S_STAR: u64 = 0x7311c2812425cfa0;
 
 #[derive(Debug)]
-struct MD6KeyError;
+pub enum MD6Error {
+    KeyLenOutOfBounds,
+}
 
-impl fmt::Display for MD6KeyError {
+impl fmt::Display for MD6Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Key length exceeds maximum allowable size of 64 bytes.")
+        match self {
+            MD6Error::KeyLenOutOfBounds => write!(
+                f,
+                "The provided key is too long for MD6. 0 <= key_len <= 64 bytes."
+            ),
+        }
     }
 }
+
+impl std::error::Error for MD6Error {}
 
 #[derive(Clone)]
 pub struct MD6Key {
@@ -50,28 +59,19 @@ pub struct MD6Key {
 }
 
 impl MD6Key {
-    pub fn new(key: Option<Vec<u8>>) -> Result<Self, MD6KeyError> {
-        const MAX_LEN: usize = 64;
-        match key {
-            None => Ok(Self {
-                key: vec![0; 8],
-                key_len: 0,
-            }),
-            Some(key) => {
-                if key.len() > MAX_LEN {
-                    return Err(MD6KeyError);
-                } else {
-                    let mut key = key.clone();
-                    let key_len = key.len();
-                    key.resize(64, 0u8);
-                    let key: Vec<u64> = key
-                        .chunks_exact(8)
-                        .map(|chunk| u64::from_be_bytes(chunk.try_into().unwrap()))
-                        .collect();
-                    Ok(Self { key, key_len })
-                }
-            }
-        }
+    pub fn new(key: &Vec<u8>) -> Result<Self, MD6Error> {
+        const MAX_KEY_LEN: usize = 64;  
+        let key_len: usize = key.len();
+        if key_len > MAX_KEY_LEN {
+            return Err(MD6Error::KeyLenOutOfBounds);
+        } 
+        let mut key = key.clone();
+        key.resize(64, 0);
+        let key: Vec<u64> = key
+            .chunks_exact(8)
+            .map(|chunk| u64::from_be_bytes(chunk.try_into().unwrap()))
+            .collect();
+        Ok(Self { key, key_len }) 
     }
 }
 
@@ -150,6 +150,9 @@ fn to_u8_vec_be(words: Vec<u64>) -> Vec<u8> {
 fn par(prev_message: Vec<u8>, d: usize, key: MD6Key, mode: usize, r: usize, level: u64) -> Vec<u8> {
     let prev_m = prev_message.len() * 8;
 
+    // TODO: idea of just doing a pad in beginning so i can send u64s to this function only!!!
+    // TODO: 
+
     let mut zero_bytes_to_add = 512 - (prev_message.len() % 512);
     if zero_bytes_to_add % 512 == 0 && prev_m > 0 {
         zero_bytes_to_add = 0;
@@ -213,6 +216,10 @@ fn seq(prev_message: Vec<u8>, d: usize, key: MD6Key, mode: usize, r: usize, leve
     vec![]
 }
 
+// REQUIREMENTS:
+// d: 1..=512
+// L: 0..=64
+
 pub struct MD6 {
     d: usize,     // (output length in bits, 1..=512)
     key: MD6Key, // Optional (not sure what happens when null yet so lets keep it like this for now TODO:)
@@ -225,7 +232,7 @@ impl MD6 {
     pub fn new(d: usize) -> Self {
         Self {
             d,
-            key: MD6Key::new(None).unwrap(),
+            key: MD6Key::new(&vec![]).unwrap(),
             mode: 64,
             r: 40 + (d / 4),
             level: 0,
@@ -344,6 +351,22 @@ impl MD6_512 {
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_key_constructor() {
+        let key1 = MD6Key::new(&vec![]).unwrap();
+        let key2 = MD6Key::new(&vec![0]).unwrap();
+        let key3 = MD6Key::new(&vec![0xff, 0x00, 0xff]).unwrap();
+        let key4 = MD6Key::new(&vec![0xff; 64]).unwrap();
+
+        assert_eq!(key1.key, vec![0; 8]);
+        assert_eq!(key2.key, vec![0; 8]);
+        assert_eq!(key3.key, vec![0xff00_ff00_0000_0000, 0, 0, 0, 0, 0, 0, 0]);
+        assert_eq!(key4.key, vec![0xffff_ffff_ffff_ffff; 8]);
+
+        let result = MD6Key::new(&vec![0; 65]);
+        assert!(matches!(result, Err(MD6Error::KeyLenOutOfBounds)));
+    }
+    
     const NUM_INPUTS: usize = 10;
     const INPUTS: [(&str, usize); NUM_INPUTS] = [
         ("", 1),
@@ -359,7 +382,7 @@ mod tests {
     ];
 
     #[test]
-    fn md6_160_works() {
+    fn test_md6_160() {
         const EXPECTED: [&str; NUM_INPUTS] = [
             "f325ee93c54cfaacd7b9007e1cf8904680993b18",
             "b5c2d6a7ce6be0c18c9a38b17a0db705c81ab6b5",
@@ -381,7 +404,7 @@ mod tests {
     }
 
     #[test]
-    fn md6_224_works() {
+    fn test_md6_224() {
         const EXPECTED: [&str; NUM_INPUTS] = [
             "d2091aa2ad17f38c51ade2697f24cafc3894c617c77ffe10fdc7abcb",
             "510c30e4202a5cdd8a4f2ae9beebb6f5988128897937615d52e6d228",
@@ -403,7 +426,7 @@ mod tests {
     }
 
     #[test]
-    fn md6_256_works() {
+    fn test_md6_256() {
         const EXPECTED: [&str; NUM_INPUTS] = [
             "bca38b24a804aa37d821d31af00f5598230122c5bbfc4c4ad5ed40e4258f04ca",
             "230637d4e6845cf0d092b558e87625f03881dd53a7439da34cf3b94ed0d8b2c5",
@@ -425,7 +448,7 @@ mod tests {
     }
 
     #[test]
-    fn md6_384_works() {
+    fn test_md6_384() {
         const EXPECTED: [&str; NUM_INPUTS] = [
             "b0bafffceebe856c1eff7e1ba2f539693f828b532ebf60ae9c16cbc3499020401b942ac25b310b2227b2954ccacc2f1f", 
             "e2c6d31dd8872cbd5a1207481cdac581054d13a4d4fe6854331cd8cf3e7cbafbaddd6e2517972b8ff57cdc4806d09190",
@@ -447,7 +470,7 @@ mod tests {
     }
 
     #[test]
-    fn md6_512_works() {
+    fn test_md6_512() {
         const EXPECTED: [&str; NUM_INPUTS] = [
             "6b7f33821a2c060ecdd81aefddea2fd3c4720270e18654f4cb08ece49ccb469f8beeee7c831206bd577f9f2630d9177979203a9489e47e04df4e6deaa0f8e0c0", 
             "00918245271e377a7ffb202b90f3bda5477d8feab12d8a3a8994ebc55fe6e74ca8341520032eeea3fdef892f2882378f636212af4b2683ccf80bf025b7d9b457",
