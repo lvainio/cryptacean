@@ -1,7 +1,7 @@
 mod cipher;
 mod hash;
 
-pub use hash::{Input, Output};
+pub use hash::{HashError, Input, Message, Output};
 
 pub use hash::md2::MD2;
 pub use hash::md4::MD4;
