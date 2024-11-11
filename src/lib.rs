@@ -1,5 +1,5 @@
-mod cipher;
-mod hash;
+pub mod cipher;
+pub mod hash;
 
 pub use hash::{HashError, Input, Message, Output};
 

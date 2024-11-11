@@ -104,9 +104,6 @@ impl Message {
             .map(|byte| format!("{:02x}", byte))
             .collect()
     }
-
-    // TODO: implement to_u64_le, to_u64_be, to_u32_le, to_u32_be
-    // TODO: test Message: buffer and bit_len accessability
 }
 
 impl fmt::Display for Message {
@@ -121,6 +118,46 @@ impl fmt::Display for Message {
         )
     }
 }
+
+pub struct Digest {
+    buffer: Vec<u8>,
+    bit_len: usize,
+}
+
+impl Digest {
+
+    // TODO: constructors. Could actually take a bit length to truncate if necessary. 
+    // Probably only need the from u8, u32be, u32le, u64be, u64be, do one at a time
+    // for the hash function we are working on and make it as flexible as possible.
+
+    pub fn to_string(&self) -> String {
+        self.buffer
+            .iter()
+            .map(|byte| format!("{:02x}", byte))
+            .collect()
+    }
+}
+
+impl fmt::Display for Digest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let hex_string: String = self.to_string();
+        write!(
+            f,
+            "Digest: {} (bytes: {}, bits: {})",
+            hex_string,
+            self.bit_len / 8,
+            self.bit_len
+        )
+    }
+}
+
+// TODO: implement Digest similar to Message
+// TODO: needs additional message for convertion from different vectors
+// TODO: when Digest is implemented, convert to use of these in hash
+//       functions 1 by 1
+// TODO: remove input / output
+// TODO: actually read something about documenting code.
+// TODO: document code
 
 pub struct Input {
     bytes: Vec<u8>,
