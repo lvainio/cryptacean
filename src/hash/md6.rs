@@ -105,29 +105,11 @@ fn to_u8_vec_be(words: Vec<u64>) -> Vec<u8> {
         .collect() // Collect all bytes into a Vec<u8>
 }
 
-fn seq(prev_message: Vec<u8>, d: usize, key: MD6Key, mode: usize, r: usize, level: u64) -> Vec<u8> {
-    let prev_m = prev_message.len() * 8;
-    let zero_bytes_to_add = 384 - (prev_message.len() % 384);
-    let mut prev_message = prev_message.clone();
-    prev_message.resize(prev_message.len() + zero_bytes_to_add, 0u8);
-
-    let prev_message: Vec<u64> = to_u64_vec_be(prev_message);
-
-    let mut new_message: Vec<u64> = Vec::new();
-
-    vec![]
-}
-
-// REQUIREMENTS:
-// d: 1..=512
-// L: 0..=64
-
 pub struct MD6 {
     d: usize,     // (output length in bits, 1..=512)
     key: MD6Key, // Optional (not sure what happens when null yet so lets keep it like this for now TODO:)
     mode: u64, // 0..=64 Optional but has a default value so should NOT be an Option TODO Switch to usize?
     r: usize,  // (number of rounds)
-    level: usize, // tree level
     rc: Vec<u64>,
 }
 
@@ -143,7 +125,6 @@ impl MD6 {
             key: MD6Key::new(&vec![]).unwrap(),
             mode: 64,
             r,
-            level: 0,
             rc,
         }
     }
@@ -171,23 +152,22 @@ impl MD6 {
     pub fn hash(&self, input: &Input) -> Output {
         let input: Vec<u8> = input.bytes.clone();
         let d: usize = self.d;
-        let key: MD6Key = self.key.clone();
-        let mode: usize = self.mode as usize;
-        let r: usize = self.r;
         let c: usize = 16;
 
-        let mut level = 0;
+        let mut level = 1;
 
-        level += 1;
-        let mut new_message: Vec<u8> = self.par(input.clone(), level);
+        let mut new_message: Vec<u64> = self.par(input.clone(), input.len(), level);
 
-        while new_message.len() * 8 != c * WORD_LENGTH {
+        let mut new_msg = to_u8_vec_be(new_message.clone());
+
+        while new_msg.len() * 8 != c * WORD_LENGTH {
             level += 1;
-            new_message = self.par(new_message.clone(), level);
+            new_message = self.par(new_msg.clone(), new_msg.len(), level);
+            new_msg = to_u8_vec_be(new_message.clone());
         }
 
         let d_bytes = d / 8;
-        Output::from_u8(new_message[new_message.len() - d_bytes..].to_vec())
+        Output::from_u8(new_msg[new_msg.len() - d_bytes..].to_vec())
     }
 
     fn compress(&self, a_vec: &mut Vec<u64>) {
@@ -203,29 +183,23 @@ impl MD6 {
         }
     }
 
-    
-
-    fn par(&self, prev_message: Vec<u8>, level: u64) -> Vec<u8> {
-        let prev_m = prev_message.len() * 8;
-
-        // TODO: idea of just doing a pad in beginning so i can send u64s to this function only!!!
-
-        let mut zero_bytes_to_add = 512 - (prev_message.len() % 512);
-        if zero_bytes_to_add % 512 == 0 && prev_m > 0 {
+    fn par(&self, message: Vec<u8>, m: usize, level: u64) -> Vec<u64> {
+        let mut zero_bytes_to_add = 512 - (m % 512);
+        if zero_bytes_to_add % 512 == 0 && m > 0 {
             zero_bytes_to_add = 0;
         }
 
-        let mut prev_message = prev_message.clone();
-        prev_message.resize(prev_message.len() + zero_bytes_to_add, 0u8);
+        let mut message = message.clone();
+        message.resize(message.len() + zero_bytes_to_add, 0u8);
 
-        let prev_m = prev_message.len() * 8;
+        let new_m = message.len() * 8;
 
-        let prev_message: Vec<u64> = to_u64_vec_be(prev_message);
+        let message: Vec<u64> = to_u64_vec_be(message);
 
         let mut new_message: Vec<u64> = Vec::new(); // allocate correct size directly no
 
         let b = 64;
-        let j = (1).max(prev_m / (b * WORD_LENGTH));
+        let j = (1).max(new_m / (b * WORD_LENGTH));
 
         for i in 0..j {
             // STEP 1
@@ -243,7 +217,7 @@ impl MD6 {
             input.extend_from_slice(&self.key.key.as_slice());
             input.push(u);
             input.push(v);
-            input.extend_from_slice(&prev_message[i * 64..((i + 1) * 64)]);
+            input.extend_from_slice(&message[i * 64..((i + 1) * 64)]);
 
             self.compress(&mut input);
 
@@ -251,9 +225,6 @@ impl MD6 {
 
             new_message.extend_from_slice(&chunk);
         }
-
-        let new_message = to_u8_vec_be(new_message);
-
         new_message
     }
 }
