@@ -22,5 +22,6 @@ This repository contains implementations of some crypto primitives.
 - [MD2](src/hash/md2.rs)
 - [MD4](src/hash/md4.rs)
 - [MD5](src/hash/md5.rs)
+- [MD6](src/hash/md6.rs)
 
 ## Supported Encryption Functions
