@@ -73,6 +73,14 @@ impl Output {
         Output::from_u8(output_u8)
     }
 
+    pub fn from_u64_be_take_n_from_end(output_u64: &Vec<u64>, num_bytes: usize) -> Output {
+        let mut output_u8: Vec<u8> = Vec::new();
+        for &value in output_u64 {
+            output_u8.extend_from_slice(&value.to_be_bytes());
+        }
+        Output::from_u8(output_u8[output_u8.len() - num_bytes..].to_vec())
+    }
+
     pub fn from_u64_le(output_u64: Vec<u64>) -> Output {
         let mut output_u8: Vec<u8> = Vec::new();
         for &value in &output_u64 {

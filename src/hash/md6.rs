@@ -1,5 +1,3 @@
-use std::{error::Error, fmt, io::Write};
-
 use crate::hash::{Input, Output};
 
 const WORD_LENGTH: usize = 64;
@@ -34,44 +32,17 @@ const LEFT_SHIFTS: [usize; 16] = [11, 24, 9, 16, 15, 9, 27, 15, 6, 2, 29, 8, 15,
 const S_PRIM_0: u64 = 0x0123456789abcdef;
 const S_STAR: u64 = 0x7311c2812425cfa0;
 
-#[derive(Debug)]
-pub enum MD6Error {
-    KeyLenOutOfBounds,
-}
-
-impl fmt::Display for MD6Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            MD6Error::KeyLenOutOfBounds => write!(
-                f,
-                "The provided key is too long for MD6. 0 <= key_len <= 64 bytes."
-            ),
-        }
-    }
-}
-
-impl std::error::Error for MD6Error {}
-
-#[derive(Clone)]
 pub struct MD6Key {
     key: Vec<u64>,
     key_len: usize,
 }
 
 impl MD6Key {
-    pub fn new(key: &Vec<u8>) -> Result<Self, MD6Error> {
-        const MAX_KEY_LEN: usize = 64;
-        let key_len: usize = key.len();
-        if key_len > MAX_KEY_LEN {
-            return Err(MD6Error::KeyLenOutOfBounds);
+    pub fn new() -> Self {
+        Self {
+            key: vec![0; 8],
+            key_len: 0,
         }
-        let mut key = key.clone();
-        key.resize(64, 0);
-        let key: Vec<u64> = key
-            .chunks_exact(8)
-            .map(|chunk| u64::from_be_bytes(chunk.try_into().unwrap()))
-            .collect();
-        Ok(Self { key, key_len })
     }
 }
 
@@ -84,32 +55,34 @@ fn build_v(r: usize, mode: usize, z: u64, p: usize, key_len: usize, d: usize) ->
         | d as u64
 }
 
-fn to_u64_vec_be(prev_message: Vec<u8>) -> Vec<u64> {
-    // Ensure the length of prev_message is a multiple of 8
-    assert!(
-        prev_message.len() % 8 == 0,
-        "Input length must be a multiple of 8"
-    );
-
-    // Convert Vec<u8> to Vec<u64>
-    prev_message
-        .chunks_exact(8) // Take 8 bytes at a time
-        .map(|chunk| u64::from_be_bytes(chunk.try_into().unwrap())) // Convert each chunk to u64
-        .collect() // Collect the u64 values into a Vec<u64>
+fn pad_u8(input: &Vec<u8>) -> Vec<u64> {
+    let m = input.len();
+    let mut zero_bytes_to_add = 512 - (m % 512);
+    if zero_bytes_to_add % 512 == 0 && m > 0 {
+        zero_bytes_to_add = 0;
+    }
+    let mut message = input.clone();
+    message.resize(message.len() + zero_bytes_to_add, 0u8);
+    message
+        .chunks_exact(8)
+        .map(|chunk| u64::from_be_bytes(chunk.try_into().unwrap()))
+        .collect()
 }
 
-fn to_u8_vec_be(words: Vec<u64>) -> Vec<u8> {
-    words
-        .iter() // Iterate over each u64
-        .flat_map(|&word| word.to_be_bytes()) // Convert each u64 to [u8; 8] and flatten
-        .collect() // Collect all bytes into a Vec<u8>
+fn pad_u64(input: &mut Vec<u64>) {
+    let m = input.len();
+    let mut zero_words_to_add = 64 - (m % 64);
+    if zero_words_to_add % 64 == 0 && m > 0 {
+        zero_words_to_add = 0;
+    }
+    input.resize(zero_words_to_add + m, 0);
 }
 
 pub struct MD6 {
-    d: usize,     // (output length in bits, 1..=512)
-    key: MD6Key, // Optional (not sure what happens when null yet so lets keep it like this for now TODO:)
-    mode: u64, // 0..=64 Optional but has a default value so should NOT be an Option TODO Switch to usize?
-    r: usize,  // (number of rounds)
+    d: usize,
+    key: MD6Key,
+    mode: u64,
+    r: usize,
     rc: Vec<u64>,
 }
 
@@ -122,52 +95,29 @@ impl MD6 {
         }
         Self {
             d,
-            key: MD6Key::new(&vec![]).unwrap(),
+            key: MD6Key::new(),
             mode: 64,
             r,
             rc,
         }
     }
 
-    pub fn with_key(mut self, key: MD6Key) -> Self {
-        self.key = key;
-        self
-    }
-
-    pub fn with_mode(mut self, mode: u64) -> Self {
-        self.mode = mode;
-        self
-    }
-
-    pub fn with_rounds(mut self, r: usize) -> Self {
-        let mut rc: Vec<u64> = vec![S_PRIM_0];
-        for i in 1..r {
-            rc.push(rc[i - 1].rotate_left(1) ^ (rc[i - 1] & S_STAR));
-        }
-        self.r = r;
-        self.rc = rc;
-        self
-    }
-
     pub fn hash(&self, input: &Input) -> Output {
-        let input: Vec<u8> = input.bytes.clone();
-        let d: usize = self.d;
-        let c: usize = 16;
+        const C: usize = 16;
+        let mut m: usize = input.bytes.len() * 8;
+
+        let input: Vec<u64> = pad_u8(&input.bytes);
 
         let mut level = 1;
+        let mut message: Vec<u64> = self.par(&input, m, level);
 
-        let mut new_message: Vec<u64> = self.par(input.clone(), input.len(), level);
-
-        let mut new_msg = to_u8_vec_be(new_message.clone());
-
-        while new_msg.len() * 8 != c * WORD_LENGTH {
+        while message.len() != C {
             level += 1;
-            new_message = self.par(new_msg.clone(), new_msg.len(), level);
-            new_msg = to_u8_vec_be(new_message.clone());
+            m = message.len() * WORD_LENGTH;
+            pad_u64(&mut message);
+            message = self.par(&message, m, level);
         }
-
-        let d_bytes = d / 8;
-        Output::from_u8(new_msg[new_msg.len() - d_bytes..].to_vec())
+        Output::from_u64_be_take_n_from_end(&message, self.d / 8)
     }
 
     fn compress(&self, a_vec: &mut Vec<u64>) {
@@ -183,47 +133,25 @@ impl MD6 {
         }
     }
 
-    fn par(&self, message: Vec<u8>, m: usize, level: u64) -> Vec<u64> {
-        let mut zero_bytes_to_add = 512 - (m % 512);
-        if zero_bytes_to_add % 512 == 0 && m > 0 {
-            zero_bytes_to_add = 0;
-        }
-
-        let mut message = message.clone();
-        message.resize(message.len() + zero_bytes_to_add, 0u8);
-
-        let new_m = message.len() * 8;
-
-        let message: Vec<u64> = to_u64_vec_be(message);
-
-        let mut new_message: Vec<u64> = Vec::new(); // allocate correct size directly no
-
-        let b = 64;
-        let j = (1).max(new_m / (b * WORD_LENGTH));
-
+    fn par(&self, message: &Vec<u64>, m: usize, level: u64) -> Vec<u64> {
+        let mut new_message: Vec<u64> = Vec::new();
+        let j = (1).max(message.len() / 64);
         for i in 0..j {
-            // STEP 1
             let mut p = 0;
-            if i == j - 1 {
-                p = zero_bytes_to_add * 8;
+            if i == j - 1 && !(m % 4096 == 0 && m > 0) {
+                p = 4096 - (m % 4096);
             }
-
             let z: u64 = if j == 1 { 1 } else { 0 };
             let v: u64 = build_v(self.r, self.mode as usize, z, p, self.key.key_len, self.d);
             let u: u64 = level * 2u64.pow(56) + i as u64;
-
             let mut input: Vec<u64> = Vec::with_capacity(89);
             input.extend_from_slice(&Q);
             input.extend_from_slice(&self.key.key.as_slice());
             input.push(u);
             input.push(v);
             input.extend_from_slice(&message[i * 64..((i + 1) * 64)]);
-
             self.compress(&mut input);
-
-            let chunk: &[u64] = &input[input.len() - 16..];
-
-            new_message.extend_from_slice(&chunk);
+            new_message.extend_from_slice(&input[input.len() - 16..]);
         }
         new_message
     }
@@ -302,22 +230,6 @@ impl MD6_512 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_key_constructor() {
-        let key1 = MD6Key::new(&vec![]).unwrap();
-        let key2 = MD6Key::new(&vec![0]).unwrap();
-        let key3 = MD6Key::new(&vec![0xff, 0x00, 0xff]).unwrap();
-        let key4 = MD6Key::new(&vec![0xff; 64]).unwrap();
-
-        assert_eq!(key1.key, vec![0; 8]);
-        assert_eq!(key2.key, vec![0; 8]);
-        assert_eq!(key3.key, vec![0xff00_ff00_0000_0000, 0, 0, 0, 0, 0, 0, 0]);
-        assert_eq!(key4.key, vec![0xffff_ffff_ffff_ffff; 8]);
-
-        let result = MD6Key::new(&vec![0; 65]);
-        assert!(matches!(result, Err(MD6Error::KeyLenOutOfBounds)));
-    }
 
     const NUM_INPUTS: usize = 10;
     const INPUTS: [(&str, usize); NUM_INPUTS] = [
