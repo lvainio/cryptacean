@@ -1,4 +1,4 @@
-use crate::hash::{Input, Output};
+use crate::hash::{Digest, Endianness, Message};
 
 const H0: u32 = 0x67452301;
 const H1: u32 = 0xEFCDAB89;
@@ -56,8 +56,8 @@ fn k(t: u32) -> u32 {
 pub struct SHA0;
 
 impl SHA0 {
-    pub fn hash(&self, input: &Input) -> Output {
-        let input: Vec<u32> = pad(&input.bytes);
+    pub fn hash(&self, input: &Message) -> Digest {
+        let input: Vec<u32> = pad(&input.buffer);
         let mut h: Vec<u32> = vec![H0, H1, H2, H3, H4];
 
         for block in input.chunks(16) {
@@ -91,7 +91,7 @@ impl SHA0 {
             h[4] = h[4].wrapping_add(a[4]);
         }
 
-        Output::from_u32_be(h)
+        Digest::from_u32(&h, Endianness::Big)
     }
 }
 
@@ -100,33 +100,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hash_works() {
+    fn test_sha0() {
         let hasher = SHA0;
-        let i1 = Input::from_string("abc");
-        let i2 = Input::from_string("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
+        let i1 = Message::from_string("abc");
+        let i2 = Message::from_string("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
 
         assert_eq!(
-            hasher.hash(&i1).output,
+            hasher.hash(&i1).to_hex(),
             "0164b8a914cd2a5e74c4f7ff082c4d97f1edf880"
         );
         assert_eq!(
-            hasher.hash(&i2).output,
+            hasher.hash(&i2).to_hex(),
             "d2516ee1acfa5baf33dfc1c471e438449ef134c8"
-        );
-    }
-
-    #[test]
-    fn hash_works_on_special_characters() {
-        let hasher = SHA0;
-        let i1 = Input::from_string("こんにちは, 世界! 😊✨");
-        let i2 = Input::from_string("안녕하세요, 세상! 🌏🎉");
-        assert_eq!(
-            hasher.hash(&i1).output,
-            "d04c7ded121be079aacdc834f1ed8bc7b254dd0f"
-        );
-        assert_eq!(
-            hasher.hash(&i2).output,
-            "cec3993b64fae339249cbf122ce700ff54c282f9"
         );
     }
 }

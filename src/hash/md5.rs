@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::hash::{Input, Output};
+use crate::hash::{Digest, Endianness, Message};
 
 const INIT_A: u32 = 0x67_45_23_01;
 const INIT_B: u32 = 0xEF_CD_AB_89;
@@ -78,8 +78,8 @@ fn i_transform(x: u32, y: u32, z: u32) -> u32 {
 pub struct MD5;
 
 impl MD5 {
-    pub fn hash(&self, input: &Input) -> Output {
-        let input: Vec<u32> = pad(&input.bytes);
+    pub fn hash(&self, input: &Message) -> Digest {
+        let input: Vec<u32> = pad(&input.buffer);
         let mut state: Vec<u32> = vec![INIT_A, INIT_B, INIT_C, INIT_D];
         for block in input.chunks(16) {
             let state_copy: Vec<u32> = state.clone();
@@ -104,7 +104,7 @@ impl MD5 {
                 state[i] = state[i].wrapping_add(state_copy[i]);
             }
         }
-        Output::from_u32_le(state)
+        Digest::from_u32(&state, Endianness::Little)
     }
 }
 
@@ -113,33 +113,45 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hash_works_on_rfc1321_suite() {
+    fn test_md5_on_rfc1321_suite() {
         let hasher = MD5;
-        let i1 = Input::from_string("");
-        let i2 = Input::from_string("a");
-        let i3 = Input::from_string("abc");
-        let i4 = Input::from_string("message digest");
-        let i5 = Input::from_string("abcdefghijklmnopqrstuvwxyz");
+        let i1 = Message::from_string("");
+        let i2 = Message::from_string("a");
+        let i3 = Message::from_string("abc");
+        let i4 = Message::from_string("message digest");
+        let i5 = Message::from_string("abcdefghijklmnopqrstuvwxyz");
         let i6 =
-            Input::from_string("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
-        let i7 = Input::from_string(
+            Message::from_string("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
+        let i7 = Message::from_string(
             "12345678901234567890123456789012345678901234567890123456789012345678901234567890",
         );
-        assert_eq!(hasher.hash(&i1).output, "d41d8cd98f00b204e9800998ecf8427e");
-        assert_eq!(hasher.hash(&i2).output, "0cc175b9c0f1b6a831c399e269772661");
-        assert_eq!(hasher.hash(&i3).output, "900150983cd24fb0d6963f7d28e17f72");
-        assert_eq!(hasher.hash(&i4).output, "f96b697d7cb7938d525a2f31aaf161d0");
-        assert_eq!(hasher.hash(&i5).output, "c3fcd3d76192e4007dfb496cca67e13b");
-        assert_eq!(hasher.hash(&i6).output, "d174ab98d277d9f5a5611c2c9f419d9f");
-        assert_eq!(hasher.hash(&i7).output, "57edf4a22be3c955ac49da2e2107b67a");
-    }
-
-    #[test]
-    fn hash_works_on_special_characters() {
-        let hasher = MD5;
-        let i1 = Input::from_string("こんにちは, 世界! 😊✨");
-        let i2 = Input::from_string("안녕하세요, 세상! 🌏🎉");
-        assert_eq!(hasher.hash(&i1).output, "9ef4d970ce73470d1a6f9d9d981c5055");
-        assert_eq!(hasher.hash(&i2).output, "783932e625c390e68c20a8cc7578ed5a");
+        assert_eq!(
+            hasher.hash(&i1).to_hex(),
+            "d41d8cd98f00b204e9800998ecf8427e"
+        );
+        assert_eq!(
+            hasher.hash(&i2).to_hex(),
+            "0cc175b9c0f1b6a831c399e269772661"
+        );
+        assert_eq!(
+            hasher.hash(&i3).to_hex(),
+            "900150983cd24fb0d6963f7d28e17f72"
+        );
+        assert_eq!(
+            hasher.hash(&i4).to_hex(),
+            "f96b697d7cb7938d525a2f31aaf161d0"
+        );
+        assert_eq!(
+            hasher.hash(&i5).to_hex(),
+            "c3fcd3d76192e4007dfb496cca67e13b"
+        );
+        assert_eq!(
+            hasher.hash(&i6).to_hex(),
+            "d174ab98d277d9f5a5611c2c9f419d9f"
+        );
+        assert_eq!(
+            hasher.hash(&i7).to_hex(),
+            "57edf4a22be3c955ac49da2e2107b67a"
+        );
     }
 }

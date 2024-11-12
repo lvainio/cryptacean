@@ -1,4 +1,4 @@
-use crate::hash::{Input, Output};
+use crate::hash::{Digest, Endianness, Message};
 
 const WORD_LENGTH: usize = 64;
 
@@ -102,11 +102,11 @@ impl MD6 {
         }
     }
 
-    pub fn hash(&self, input: &Input) -> Output {
+    pub fn hash(&self, input: &Message) -> Digest {
         const C: usize = 16;
-        let mut m: usize = input.bytes.len() * 8;
+        let mut m: usize = input.buffer.len() * 8;
 
-        let input: Vec<u64> = pad_u8(&input.bytes);
+        let input: Vec<u64> = pad_u8(&input.buffer);
 
         let mut level = 1;
         let mut message: Vec<u64> = self.par(&input, m, level);
@@ -117,7 +117,10 @@ impl MD6 {
             pad_u64(&mut message);
             message = self.par(&message, m, level);
         }
-        Output::from_u64_be_take_n_from_end(&message, self.d / 8)
+
+        let start_idx = (message.len() * 8) - (self.d / 8);
+        let end_idx = message.len() * 8;
+        Digest::from_u64_range(&message, Endianness::Big, start_idx..end_idx).unwrap()
     }
 
     fn compress(&self, a_vec: &mut Vec<u64>) {
@@ -166,7 +169,7 @@ impl MD6_160 {
         Self { md6: MD6::new(160) }
     }
 
-    pub fn hash(&self, input: &Input) -> Output {
+    pub fn hash(&self, input: &Message) -> Digest {
         self.md6.hash(input)
     }
 }
@@ -180,7 +183,7 @@ impl MD6_224 {
         Self { md6: MD6::new(224) }
     }
 
-    pub fn hash(&self, input: &Input) -> Output {
+    pub fn hash(&self, input: &Message) -> Digest {
         self.md6.hash(input)
     }
 }
@@ -194,7 +197,7 @@ impl MD6_256 {
         Self { md6: MD6::new(256) }
     }
 
-    pub fn hash(&self, input: &Input) -> Output {
+    pub fn hash(&self, input: &Message) -> Digest {
         self.md6.hash(input)
     }
 }
@@ -208,7 +211,7 @@ impl MD6_384 {
         Self { md6: MD6::new(384) }
     }
 
-    pub fn hash(&self, input: &Input) -> Output {
+    pub fn hash(&self, input: &Message) -> Digest {
         self.md6.hash(input)
     }
 }
@@ -222,7 +225,7 @@ impl MD6_512 {
         Self { md6: MD6::new(512) }
     }
 
-    pub fn hash(&self, input: &Input) -> Output {
+    pub fn hash(&self, input: &Message) -> Digest {
         self.md6.hash(input)
     }
 }
@@ -262,8 +265,8 @@ mod tests {
         let md6_160 = MD6_160::new();
         for i in 0..NUM_INPUTS {
             let (input_string, repeats) = INPUTS[i];
-            let input = Input::from_string(&input_string.repeat(repeats));
-            assert_eq!(md6_160.hash(&input).output, EXPECTED[i]);
+            let input = Message::from_string(&input_string.repeat(repeats));
+            assert_eq!(md6_160.hash(&input).to_hex(), EXPECTED[i]);
         }
     }
 
@@ -284,8 +287,8 @@ mod tests {
         let md6_224 = MD6_224::new();
         for i in 0..NUM_INPUTS {
             let (input_string, repeats) = INPUTS[i];
-            let input = Input::from_string(&input_string.repeat(repeats));
-            assert_eq!(md6_224.hash(&input).output, EXPECTED[i]);
+            let input = Message::from_string(&input_string.repeat(repeats));
+            assert_eq!(md6_224.hash(&input).to_hex(), EXPECTED[i]);
         }
     }
 
@@ -306,8 +309,8 @@ mod tests {
         let md6_256 = MD6_256::new();
         for i in 0..NUM_INPUTS {
             let (input_string, repeats) = INPUTS[i];
-            let input = Input::from_string(&input_string.repeat(repeats));
-            assert_eq!(md6_256.hash(&input).output, EXPECTED[i]);
+            let input = Message::from_string(&input_string.repeat(repeats));
+            assert_eq!(md6_256.hash(&input).to_hex(), EXPECTED[i]);
         }
     }
 
@@ -328,8 +331,8 @@ mod tests {
         let md6_384 = MD6_384::new();
         for i in 0..NUM_INPUTS {
             let (input_string, repeats) = INPUTS[i];
-            let input = Input::from_string(&input_string.repeat(repeats));
-            assert_eq!(md6_384.hash(&input).output, EXPECTED[i]);
+            let input = Message::from_string(&input_string.repeat(repeats));
+            assert_eq!(md6_384.hash(&input).to_hex(), EXPECTED[i]);
         }
     }
 
@@ -350,8 +353,8 @@ mod tests {
         let md6_512 = MD6_512::new();
         for i in 0..NUM_INPUTS {
             let (input_string, repeats) = INPUTS[i];
-            let input = Input::from_string(&input_string.repeat(repeats));
-            assert_eq!(md6_512.hash(&input).output, EXPECTED[i]);
+            let input = Message::from_string(&input_string.repeat(repeats));
+            assert_eq!(md6_512.hash(&input).to_hex(), EXPECTED[i]);
         }
     }
 }
