@@ -1,6 +1,6 @@
 use itertools::iproduct;
 
-use crate::hash::{Input, Output};
+use crate::hash::{Digest, Endianness, Message};
 
 const RHO_TABLE: [[u32; 5]; 5] = [
     [0, 36, 3, 41, 18],
@@ -47,9 +47,9 @@ The Keccak padding function then appends a '1' bit, zero or more '0' bits,
 and then a '1' bit. The final length of the input message should be
 congruent to the rate. The two '1' bits are always added.
 */
-fn pad(input: &Input, rate: usize) -> Vec<u64> {
-    let input_length: usize = input.bytes.len();
-    let mut buffer = input.bytes.clone();
+fn pad(input: &Message, rate: usize) -> Vec<u64> {
+    let input_length: usize = input.buffer.len();
+    let mut buffer = input.buffer.clone();
     if input_length % rate == rate - 1 {
         buffer.push(0x86); // 1000 0110
     } else {
@@ -136,10 +136,14 @@ impl SHA3_224 {
         Self { rate: 144 }
     }
 
-    pub fn hash(&self, input: &Input) -> Output {
+    pub fn hash(&self, input: &Message) -> Digest {
         let padded_input: Vec<u64> = pad(input, self.rate);
         let state = absorb(&padded_input, self.rate);
-        Output::from_u64_le_drop_4_bytes(vec![state[0][0], state[1][0], state[2][0], state[3][0]])
+
+        let digest = vec![state[0][0], state[1][0], state[2][0], state[3][0]];
+        let start_idx = 0;
+        let end_idx = (digest.len() * 8) - 4;
+        Digest::from_u64_range(&digest, Endianness::Little, start_idx..end_idx).unwrap()
     }
 }
 
@@ -152,10 +156,13 @@ impl SHA3_256 {
         Self { rate: 136 }
     }
 
-    pub fn hash(&self, input: &Input) -> Output {
+    pub fn hash(&self, input: &Message) -> Digest {
         let padded_input: Vec<u64> = pad(input, self.rate);
         let state = absorb(&padded_input, self.rate);
-        Output::from_u64_le(vec![state[0][0], state[1][0], state[2][0], state[3][0]])
+        Digest::from_u64(
+            &vec![state[0][0], state[1][0], state[2][0], state[3][0]],
+            Endianness::Little,
+        )
     }
 }
 
@@ -168,17 +175,20 @@ impl SHA3_384 {
         Self { rate: 104 }
     }
 
-    pub fn hash(&self, input: &Input) -> Output {
+    pub fn hash(&self, input: &Message) -> Digest {
         let padded_input: Vec<u64> = pad(input, self.rate);
         let state = absorb(&padded_input, self.rate);
-        Output::from_u64_le(vec![
-            state[0][0],
-            state[1][0],
-            state[2][0],
-            state[3][0],
-            state[4][0],
-            state[0][1],
-        ])
+        Digest::from_u64(
+            &vec![
+                state[0][0],
+                state[1][0],
+                state[2][0],
+                state[3][0],
+                state[4][0],
+                state[0][1],
+            ],
+            Endianness::Little,
+        )
     }
 }
 
@@ -191,19 +201,22 @@ impl SHA3_512 {
         Self { rate: 72 }
     }
 
-    pub fn hash(&self, input: &Input) -> Output {
+    pub fn hash(&self, input: &Message) -> Digest {
         let padded_input: Vec<u64> = pad(input, self.rate);
         let state = absorb(&padded_input, self.rate);
-        Output::from_u64_le(vec![
-            state[0][0],
-            state[1][0],
-            state[2][0],
-            state[3][0],
-            state[4][0],
-            state[0][1],
-            state[1][1],
-            state[2][1],
-        ])
+        Digest::from_u64(
+            &vec![
+                state[0][0],
+                state[1][0],
+                state[2][0],
+                state[3][0],
+                state[4][0],
+                state[0][1],
+                state[1][1],
+                state[2][1],
+            ],
+            Endianness::Little,
+        )
     }
 }
 
@@ -212,65 +225,65 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sha3_224_works() {
+    fn test_sha3_224() {
         let sha3_224 = SHA3_224::new();
-        let i1 = Input::from_string("abc");
-        let i2 = Input::from_string("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu");
+        let i1 = Message::from_string("abc");
+        let i2 = Message::from_string("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu");
 
         assert_eq!(
-            sha3_224.hash(&i1).output,
+            sha3_224.hash(&i1).to_hex(),
             "e642824c3f8cf24ad09234ee7d3c766fc9a3a5168d0c94ad73b46fdf"
         );
         assert_eq!(
-            sha3_224.hash(&i2).output,
+            sha3_224.hash(&i2).to_hex(),
             "543e6868e1666c1a643630df77367ae5a62a85070a51c14cbf665cbc"
         );
     }
 
     #[test]
-    fn sha3_256_works() {
+    fn test_sha3_256() {
         let sha3_256 = SHA3_256::new();
-        let i1 = Input::from_string("abc");
-        let i2 = Input::from_string("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu");
+        let i1 = Message::from_string("abc");
+        let i2 = Message::from_string("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu");
 
         assert_eq!(
-            sha3_256.hash(&i1).output,
+            sha3_256.hash(&i1).to_hex(),
             "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532"
         );
         assert_eq!(
-            sha3_256.hash(&i2).output,
+            sha3_256.hash(&i2).to_hex(),
             "916f6061fe879741ca6469b43971dfdb28b1a32dc36cb3254e812be27aad1d18"
         );
     }
 
     #[test]
-    fn sha3_384_works() {
+    fn test_sha3_384() {
         let sha3_384 = SHA3_384::new();
-        let i1 = Input::from_string("abc");
-        let i2 = Input::from_string("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu");
+        let i1 = Message::from_string("abc");
+        let i2 = Message::from_string("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu");
 
         assert_eq!(
-            sha3_384.hash(&i1).output,
+            sha3_384.hash(&i1).to_hex(),
             "ec01498288516fc926459f58e2c6ad8df9b473cb0fc08c2596da7cf0e49be4b298d88cea927ac7f539f1edf228376d25"
         );
         assert_eq!(
-            sha3_384.hash(&i2).output,
+            sha3_384.hash(&i2).to_hex(),
             "79407d3b5916b59c3e30b09822974791c313fb9ecc849e406f23592d04f625dc8c709b98b43b3852b337216179aa7fc7"
         );
     }
 
     #[test]
-    fn sha3_512_works() {
+    fn test_sha3_512() {
         let sha3_512 = SHA3_512::new();
-        let i1 = Input::from_string("abc");
-        let i2 = Input::from_string("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu");
+        let i1 = Message::from_string("abc");
+        let i2 = Message::from_string("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu");
 
         assert_eq!(
-            sha3_512.hash(&i1).output,
+            sha3_512.hash(&i1).to_hex(),
             "b751850b1a57168a5693cd924b6b096e08f621827444f70d884f5d0240d2712e10e116e9192af3c91a7ec57647e3934057340b4cf408d5a56592f8274eec53f0"
         );
         assert_eq!(
-            sha3_512.hash(&i2).output,
+            sha3_512.hash(&i2).to_hex(),
             "afebb2ef542e6579c50cad06d2e578f9f8dd6881d7dc824d26360feebf18a4fa73e3261122948efcfd492e74e82e2189ed0fb440d187f382270cb455f21dd185"
         );
     }

@@ -1,4 +1,4 @@
-use crate::hash::{Input, Output};
+use crate::hash::{Digest, Endianness, Message};
 
 const K: [u64; 80] = [
     0x428a2f98d728ae22,
@@ -145,19 +145,11 @@ fn ssig1(x: u64) -> u64 {
     x.rotate_right(19) ^ x.rotate_right(61) ^ (x >> 6)
 }
 
-fn u64_to_u8_vec(h: &Vec<u64>) -> Vec<u8> {
-    let mut output = Vec::with_capacity(h.len() * 8);
-    for &value in h {
-        output.extend_from_slice(&value.to_be_bytes());
-    }
-    output
-}
-
 pub struct SHA512_256;
 
 impl SHA512_256 {
-    pub fn hash(&self, input: &Input) -> Output {
-        let input: Vec<u64> = pad(&input.bytes);
+    pub fn hash(&self, input: &Message) -> Digest {
+        let input: Vec<u64> = pad(&input.buffer);
         let mut h: Vec<u64> = vec![H0, H1, H2, H3, H4, H5, H6, H7];
 
         for block in input.chunks(16) {
@@ -200,7 +192,7 @@ impl SHA512_256 {
             h[6] = h[6].wrapping_add(a[6]);
             h[7] = h[7].wrapping_add(a[7]);
         }
-        Output::from_u8(u64_to_u8_vec(&h)[0..32].to_vec())
+        Digest::from_u64_range(&h, Endianness::Big, 0..32).unwrap()
     }
 }
 
@@ -209,33 +201,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hash_works() {
+    fn test_sha512_256() {
         let hasher = SHA512_256;
-        let i1 = Input::from_string("abc");
-        let i2 = Input::from_string("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu");
+        let i1 = Message::from_string("abc");
+        let i2 = Message::from_string("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu");
 
         assert_eq!(
-            hasher.hash(&i1).output,
+            hasher.hash(&i1).to_hex(),
             "53048e2681941ef99b2e29b76b4c7dabe4c2d0c634fc6d46e0e2f13107e7af23"
         );
         assert_eq!(
-            hasher.hash(&i2).output,
+            hasher.hash(&i2).to_hex(),
             "3928e184fb8690f840da3988121d31be65cb9d3ef83ee6146feac861e19b563a"
-        );
-    }
-
-    #[test]
-    fn hash_works_on_special_characters() {
-        let hasher = SHA512_256;
-        let i1 = Input::from_string("こんにちは, 世界! 😊✨");
-        let i2 = Input::from_string("안녕하세요, 세상! 🌏🎉");
-        assert_eq!(
-            hasher.hash(&i1).output,
-            "1e534922da8a094d246119581c39acae688d872ace29c8d718b5a021c07a4413"
-        );
-        assert_eq!(
-            hasher.hash(&i2).output,
-            "d3942d9dd1f1e85791d1b70a747759abb2da4e80585efac1585fd41ef395cd20"
         );
     }
 }

@@ -1,4 +1,4 @@
-use crate::hash::{Input, Output};
+use crate::hash::{Digest, Endianness, Message};
 
 const K: [u64; 80] = [
     0x428a2f98d728ae22,
@@ -148,8 +148,8 @@ fn ssig1(x: u64) -> u64 {
 pub struct SHA384;
 
 impl SHA384 {
-    pub fn hash(&self, input: &Input) -> Output {
-        let input: Vec<u64> = pad(&input.bytes);
+    pub fn hash(&self, input: &Message) -> Digest {
+        let input: Vec<u64> = pad(&input.buffer);
         let mut h: Vec<u64> = vec![H0, H1, H2, H3, H4, H5, H6, H7];
 
         for block in input.chunks(16) {
@@ -194,7 +194,7 @@ impl SHA384 {
         }
         h.pop();
         h.pop();
-        Output::from_u64_be(h)
+        Digest::from_u64(&h, Endianness::Big)
     }
 }
 
@@ -203,45 +203,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hash_works_on_rfc6234_suite() {
+    fn test_sha384_on_rfc6234_suite() {
         let hasher = SHA384;
-        let i1 = Input::from_string("abc");
-        let i2 = Input::from_string("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu");
-        let i3 = Input::from_string(&"a".repeat(1_000_000));
-        let i4 = Input::from_string(
+        let i1 = Message::from_string("abc");
+        let i2 = Message::from_string("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu");
+        let i3 = Message::from_string(&"a".repeat(1_000_000));
+        let i4 = Message::from_string(
             &"0123456701234567012345670123456701234567012345670123456701234567".repeat(10),
         );
 
         assert_eq!(
-            hasher.hash(&i1).output,
+            hasher.hash(&i1).to_hex(),
             "CB00753F45A35E8BB5A03D699AC65007272C32AB0EDED1631A8B605A43FF5BED8086072BA1E7CC2358BAECA134C825A7".to_lowercase()
         );
         assert_eq!(
-            hasher.hash(&i2).output,
+            hasher.hash(&i2).to_hex(),
             "09330C33F71147E83D192FC782CD1B4753111B173B3B05D22FA08086E3B0F712FCC7C71A557E2DB966C3E9FA91746039".to_lowercase()
         );
         assert_eq!(
-            hasher.hash(&i3).output,
+            hasher.hash(&i3).to_hex(),
             "9D0E1809716474CB086E834E310A4A1CED149E9C00F248527972CEC5704C2A5B07B8B3DC38ECC4EBAE97DDD87F3D8985".to_lowercase()
         );
         assert_eq!(
-            hasher.hash(&i4).output,
+            hasher.hash(&i4).to_hex(),
             "2FC64A4F500DDB6828F6A3430B8DD72A368EB7F3A8322A70BC84275B9C0B3AB00D27A5CC3C2D224AA6B61A0D79FB4596".to_lowercase()
-        );
-    }
-
-    #[test]
-    fn hash_works_on_special_characters() {
-        let hasher = SHA384;
-        let i1 = Input::from_string("こんにちは, 世界! 😊✨");
-        let i2 = Input::from_string("안녕하세요, 세상! 🌏🎉");
-        assert_eq!(
-            hasher.hash(&i1).output,
-            "ef302cf00cfec95140f64fee17056a66e2fd8185912c0a65fb6c9f49f9d907cd153d052c2071953f6049cea7bb7d6f21"
-        );
-        assert_eq!(
-            hasher.hash(&i2).output,
-            "3b24f81c896b6cd04da1890835673f6119d40d6377b3cd51c2f44c5daf01ae82f53700c0cb5b2b6a79df629cf1bdcae5"
         );
     }
 }

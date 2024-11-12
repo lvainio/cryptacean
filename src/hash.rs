@@ -1,4 +1,4 @@
-use std::{error::Error, fmt};
+use std::{error, fmt, ops};
 
 pub mod md2;
 pub mod md4;
@@ -18,29 +18,36 @@ pub mod sha512_256;
 #[derive(Debug)]
 pub enum HashError {
     InvalidHexError,
+    RangeOutOfBoundsError,
 }
 
 impl fmt::Display for HashError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             HashError::InvalidHexError => write!(f, "Invalid hexadecimal string provided"),
+            HashError::RangeOutOfBoundsError => write!(f, "Provided range is out of bounds"),
         }
     }
 }
 
-impl Error for HashError {}
+impl error::Error for HashError {}
+
+pub enum Endianness {
+    Big,
+    Little,
+}
 
 #[derive(Clone, Debug)]
 pub struct Message {
     buffer: Vec<u8>,
-    bit_len: usize,
+    message_size: usize,
 }
 
 impl Message {
     pub fn new() -> Self {
         Self {
             buffer: vec![],
-            bit_len: 0,
+            message_size: 0,
         }
     }
 
@@ -56,176 +63,199 @@ impl Message {
                 Err(_) => return Err(HashError::InvalidHexError),
             }
         }
-        self.bit_len = self.buffer.len() * 8;
+        self.message_size = self.buffer.len() * 8;
         Ok(())
     }
 
     pub fn extend_from_slice(&mut self, bytes: &[u8]) {
         self.buffer.extend_from_slice(bytes);
-        self.bit_len = self.buffer.len() * 8;
+        self.message_size = self.buffer.len() * 8;
     }
 
     pub fn extend_from_string(&mut self, message: &str) {
         self.buffer.extend_from_slice(message.as_bytes());
-        self.bit_len = self.buffer.len() * 8;
+        self.message_size = self.buffer.len() * 8;
     }
 
-    pub fn from_hex(hex: &str) -> Result<Self, HashError> {
-        if hex.len() % 2 != 0 {
+    pub fn from_hex(message: &str) -> Result<Self, HashError> {
+        if message.len() % 2 != 0 {
             return Err(HashError::InvalidHexError);
         }
         let mut buffer = Vec::new();
-        for i in (0..hex.len()).step_by(2) {
-            let byte_str = &hex[i..i + 2];
+        for i in (0..message.len()).step_by(2) {
+            let byte_str = &message[i..i + 2];
             match u8::from_str_radix(byte_str, 16) {
                 Ok(byte) => buffer.push(byte),
                 Err(_) => return Err(HashError::InvalidHexError),
             }
         }
-        let bit_len = buffer.len() * 8;
-        Ok(Self { buffer, bit_len })
+        let message_size = buffer.len() * 8;
+        Ok(Self {
+            buffer,
+            message_size,
+        })
     }
 
-    pub fn from_slice(bytes: &[u8]) -> Self {
-        let buffer: Vec<u8> = bytes.to_vec();
-        let bit_len: usize = buffer.len() * 8;
-        Self { buffer, bit_len }
+    pub fn from_slice(message: &[u8]) -> Self {
+        let buffer: Vec<u8> = message.to_vec();
+        let message_size: usize = buffer.len() * 8;
+        Self {
+            buffer,
+            message_size,
+        }
     }
 
     pub fn from_string(message: &str) -> Self {
         let buffer: Vec<u8> = message.as_bytes().to_vec();
-        let bit_len: usize = buffer.len();
-        Self { buffer, bit_len }
+        let message_size: usize = buffer.len();
+        Self {
+            buffer,
+            message_size,
+        }
+    }
+
+    pub fn to_hex(&self) -> String {
+        self.buffer
+            .iter()
+            .map(|byte| format!("{:02x}", byte))
+            .collect()
+    }
+
+    pub fn to_slice(&self) -> &[u8] {
+        &self.buffer
     }
 
     pub fn to_string(&self) -> String {
         self.buffer
             .iter()
-            .map(|byte| format!("{:02x}", byte))
-            .collect()
+            .map(|byte| format!("0x{byte:02x}, "))
+            .collect::<Vec<String>>()
+            .join("")
     }
 }
 
 impl fmt::Display for Message {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let hex_string: String = self.to_string();
+        let hex_string: String = self.to_hex();
         write!(
             f,
             "Message: {} (bytes: {}, bits: {})",
             hex_string,
-            self.bit_len / 8,
-            self.bit_len
+            self.message_size / 8,
+            self.message_size
         )
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Digest {
     buffer: Vec<u8>,
-    bit_len: usize,
+    digest_size: usize,
 }
 
 impl Digest {
+    pub fn from_u8(digest: &[u8]) -> Self {
+        let buffer: Vec<u8> = digest.to_vec();
+        let digest_size: usize = buffer.len() * 8;
+        Self {
+            buffer,
+            digest_size,
+        }
+    }
 
-    // TODO: constructors. Could actually take a bit length to truncate if necessary. 
-    // Probably only need the from u8, u32be, u32le, u64be, u64be, do one at a time
-    // for the hash function we are working on and make it as flexible as possible.
+    pub fn from_u32(digest_u32: &[u32], endianness: Endianness) -> Self {
+        let mut digest_u8: Vec<u8> = vec![];
+        for &value in digest_u32 {
+            match endianness {
+                Endianness::Big => digest_u8.extend_from_slice(&value.to_be_bytes()),
+                Endianness::Little => digest_u8.extend_from_slice(&value.to_le_bytes()),
+            }
+        }
+        Self::from_u8(&digest_u8)
+    }
 
-    pub fn to_string(&self) -> String {
+    pub fn from_u32_range(
+        digest_u32: &[u32],
+        endianness: Endianness,
+        byte_range: ops::Range<usize>,
+    ) -> Result<Self, HashError> {
+        let mut digest_u8: Vec<u8> = vec![];
+        for &value in digest_u32 {
+            match endianness {
+                Endianness::Big => digest_u8.extend_from_slice(&value.to_be_bytes()),
+                Endianness::Little => digest_u8.extend_from_slice(&value.to_le_bytes()),
+            }
+        }
+        if byte_range.start > byte_range.end
+            || byte_range.start >= digest_u8.len()
+            || byte_range.end > digest_u8.len()
+        {
+            return Err(HashError::RangeOutOfBoundsError);
+        }
+        Ok(Self::from_u8(&digest_u8[byte_range]))
+    }
+
+    pub fn from_u64(digest_u64: &[u64], endianness: Endianness) -> Self {
+        let mut digest_u8: Vec<u8> = vec![];
+        for &value in digest_u64 {
+            match endianness {
+                Endianness::Big => digest_u8.extend_from_slice(&value.to_be_bytes()),
+                Endianness::Little => digest_u8.extend_from_slice(&value.to_le_bytes()),
+            }
+        }
+        Self::from_u8(&digest_u8)
+    }
+
+    pub fn from_u64_range(
+        digest_u64: &[u64],
+        endianness: Endianness,
+        byte_range: ops::Range<usize>,
+    ) -> Result<Self, HashError> {
+        let mut digest_u8: Vec<u8> = vec![];
+        for &value in digest_u64 {
+            match endianness {
+                Endianness::Big => digest_u8.extend_from_slice(&value.to_be_bytes()),
+                Endianness::Little => digest_u8.extend_from_slice(&value.to_le_bytes()),
+            }
+        }
+        if byte_range.start > byte_range.end
+            || byte_range.start >= digest_u8.len()
+            || byte_range.end > digest_u8.len()
+        {
+            return Err(HashError::RangeOutOfBoundsError);
+        }
+        Ok(Self::from_u8(&digest_u8[byte_range]))
+    }
+
+    pub fn to_hex(&self) -> String {
         self.buffer
             .iter()
             .map(|byte| format!("{:02x}", byte))
             .collect()
     }
+
+    pub fn to_slice(&self) -> &[u8] {
+        &self.buffer
+    }
+
+    pub fn to_string(&self) -> String {
+        self.buffer
+            .iter()
+            .map(|byte| format!("0x{byte:02x}, "))
+            .collect::<Vec<String>>()
+            .join("")
+    }
 }
 
 impl fmt::Display for Digest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let hex_string: String = self.to_string();
+        let hex_string: String = self.to_hex();
         write!(
             f,
             "Digest: {} (bytes: {}, bits: {})",
             hex_string,
-            self.bit_len / 8,
-            self.bit_len
+            self.digest_size / 8,
+            self.digest_size
         )
-    }
-}
-
-// TODO: implement Digest similar to Message
-// TODO: needs additional message for convertion from different vectors
-// TODO: when Digest is implemented, convert to use of these in hash
-//       functions 1 by 1
-// TODO: remove input / output
-// TODO: actually read something about documenting code.
-// TODO: document code
-
-pub struct Input {
-    bytes: Vec<u8>,
-}
-
-impl Input {
-    pub fn from_string(msg: &str) -> Input {
-        Input {
-            bytes: msg.as_bytes().to_vec(),
-        }
-    }
-}
-
-pub struct Output {
-    pub output: String,
-}
-
-impl Output {
-    pub fn from_u8(output: Vec<u8>) -> Output {
-        let output = output.iter().map(|byte| format!("{:02x}", byte)).collect();
-        Output { output }
-    }
-
-    pub fn from_u32_le(output_u32: Vec<u32>) -> Output {
-        let mut output_u8: Vec<u8> = Vec::new();
-        for &value in &output_u32 {
-            output_u8.extend_from_slice(&value.to_le_bytes());
-        }
-        Output::from_u8(output_u8)
-    }
-
-    pub fn from_u32_be(output_u32: Vec<u32>) -> Output {
-        let mut output_u8: Vec<u8> = Vec::new();
-        for &value in &output_u32 {
-            output_u8.extend_from_slice(&value.to_be_bytes());
-        }
-        Output::from_u8(output_u8)
-    }
-
-    pub fn from_u64_be(output_u64: Vec<u64>) -> Output {
-        let mut output_u8: Vec<u8> = Vec::new();
-        for &value in &output_u64 {
-            output_u8.extend_from_slice(&value.to_be_bytes());
-        }
-        Output::from_u8(output_u8)
-    }
-
-    pub fn from_u64_be_take_n_from_end(output_u64: &Vec<u64>, num_bytes: usize) -> Output {
-        let mut output_u8: Vec<u8> = Vec::new();
-        for &value in output_u64 {
-            output_u8.extend_from_slice(&value.to_be_bytes());
-        }
-        Output::from_u8(output_u8[output_u8.len() - num_bytes..].to_vec())
-    }
-
-    pub fn from_u64_le(output_u64: Vec<u64>) -> Output {
-        let mut output_u8: Vec<u8> = Vec::new();
-        for &value in &output_u64 {
-            output_u8.extend_from_slice(&value.to_le_bytes());
-        }
-        Output::from_u8(output_u8)
-    }
-
-    pub fn from_u64_le_drop_4_bytes(output_u64: Vec<u64>) -> Output {
-        let mut output_u8: Vec<u8> = Vec::new();
-        for &value in &output_u64 {
-            output_u8.extend_from_slice(&value.to_le_bytes());
-        }
-        Output::from_u8(output_u8[..output_u8.len() - 4].to_vec())
     }
 }

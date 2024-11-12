@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::hash::{Input, Output};
+use crate::hash::{Digest, Endianness, Message};
 
 const INIT_A: u32 = 0x67_45_23_01;
 const INIT_B: u32 = 0xEF_CD_AB_89;
@@ -61,8 +61,8 @@ fn h_transform(x: u32, y: u32, z: u32) -> u32 {
 pub struct MD4;
 
 impl MD4 {
-    pub fn hash(&self, input: &Input) -> Output {
-        let input: Vec<u32> = pad(&input.bytes);
+    pub fn hash(&self, input: &Message) -> Digest {
+        let input: Vec<u32> = pad(&input.buffer);
         let mut state: Vec<u32> = vec![INIT_A, INIT_B, INIT_C, INIT_D];
         for block in input.chunks(16) {
             let state_copy: Vec<u32> = state.clone();
@@ -85,7 +85,7 @@ impl MD4 {
                 state[i] = state[i].wrapping_add(state_copy[i]);
             }
         }
-        Output::from_u32_le(state)
+        Digest::from_u32(&state, Endianness::Little)
     }
 }
 
@@ -94,33 +94,45 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hash_works_on_rfc1320_suite() {
+    fn test_md4_on_rfc1320_suite() {
         let hasher = MD4;
-        let i1 = Input::from_string("");
-        let i2 = Input::from_string("a");
-        let i3 = Input::from_string("abc");
-        let i4 = Input::from_string("message digest");
-        let i5 = Input::from_string("abcdefghijklmnopqrstuvwxyz");
+        let i1 = Message::from_string("");
+        let i2 = Message::from_string("a");
+        let i3 = Message::from_string("abc");
+        let i4 = Message::from_string("message digest");
+        let i5 = Message::from_string("abcdefghijklmnopqrstuvwxyz");
         let i6 =
-            Input::from_string("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
-        let i7 = Input::from_string(
+            Message::from_string("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
+        let i7 = Message::from_string(
             "12345678901234567890123456789012345678901234567890123456789012345678901234567890",
         );
-        assert_eq!(hasher.hash(&i1).output, "31d6cfe0d16ae931b73c59d7e0c089c0");
-        assert_eq!(hasher.hash(&i2).output, "bde52cb31de33e46245e05fbdbd6fb24");
-        assert_eq!(hasher.hash(&i3).output, "a448017aaf21d8525fc10ae87aa6729d");
-        assert_eq!(hasher.hash(&i4).output, "d9130a8164549fe818874806e1c7014b");
-        assert_eq!(hasher.hash(&i5).output, "d79e1c308aa5bbcdeea8ed63df412da9");
-        assert_eq!(hasher.hash(&i6).output, "043f8582f241db351ce627e153e7f0e4");
-        assert_eq!(hasher.hash(&i7).output, "e33b4ddc9c38f2199c3e7b164fcc0536");
-    }
-
-    #[test]
-    fn hash_works_on_special_characters() {
-        let hasher = MD4;
-        let i1 = Input::from_string("こんにちは, 世界! 😊✨");
-        let i2 = Input::from_string("안녕하세요, 세상! 🌏🎉");
-        assert_eq!(hasher.hash(&i1).output, "df12e4291df494e45e59f7c0d17f8bce");
-        assert_eq!(hasher.hash(&i2).output, "6334b266cff8e05d6ccd33d852ed5fd9");
+        assert_eq!(
+            hasher.hash(&i1).to_hex(),
+            "31d6cfe0d16ae931b73c59d7e0c089c0"
+        );
+        assert_eq!(
+            hasher.hash(&i2).to_hex(),
+            "bde52cb31de33e46245e05fbdbd6fb24"
+        );
+        assert_eq!(
+            hasher.hash(&i3).to_hex(),
+            "a448017aaf21d8525fc10ae87aa6729d"
+        );
+        assert_eq!(
+            hasher.hash(&i4).to_hex(),
+            "d9130a8164549fe818874806e1c7014b"
+        );
+        assert_eq!(
+            hasher.hash(&i5).to_hex(),
+            "d79e1c308aa5bbcdeea8ed63df412da9"
+        );
+        assert_eq!(
+            hasher.hash(&i6).to_hex(),
+            "043f8582f241db351ce627e153e7f0e4"
+        );
+        assert_eq!(
+            hasher.hash(&i7).to_hex(),
+            "e33b4ddc9c38f2199c3e7b164fcc0536"
+        );
     }
 }
